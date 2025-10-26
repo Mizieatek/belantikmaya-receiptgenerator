@@ -52,6 +52,15 @@
     .totals .discount{font-weight:600}
     .totals .grand{font-weight:900;font-size:15px}
     .foot{margin-top:12px;font-size:12px;color:#555}
+
+    /* print: hide everything except receipt and force A5 size */
+    @media print{
+      body *{visibility:hidden}
+      #receipt, #receipt *{visibility:visible}
+      #receipt{position:fixed;left:0;top:0;width:148mm;height:210mm;margin:0;padding:12mm;box-sizing:border-box}
+      @page { size: 148mm 210mm; margin:0; }
+    }
+
     @media(max-width:900px){
       .app{flex-direction:column}
       .header{flex-direction:column;align-items:flex-start}
@@ -60,17 +69,10 @@
       .inv{text-align:left}
       .receipt{max-width:100%;padding:12px}
     }
-    @media print{
-      body{background:#fff}
-      .app>*{display:none}
-      .receipt{box-shadow:none;margin:0}
-      @page{size:148mm 210mm;margin:0}
-    }
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- Form column -->
     <div class="col" id="formCol">
       <h3>Konfigurasi Resit — BelantikMaya</h3>
 
@@ -158,7 +160,6 @@
 
     </div>
 
-    <!-- Preview column -->
     <div class="col" id="previewCol">
       <div class="preview-viewport">
         <div id="receipt" class="receipt" role="document">
@@ -188,9 +189,7 @@
               <div id="rCustEmail"></div>
               <div id="rCustPhone"></div>
             </div>
-            <div class="inv">
-              <!-- intentionally left empty -->
-            </div>
+            <div class="inv"></div>
           </div>
 
           <table class="items" id="rItems">
@@ -208,9 +207,6 @@
       </div>
     </div>
   </div>
-
-  <!-- html2pdf bundle -->
-  <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
 
   <script>
   document.addEventListener('DOMContentLoaded', function(){
@@ -230,7 +226,6 @@
       `;
       itemsBody.appendChild(tr);
 
-      // bind events for this row
       const descEl = tr.querySelector('.itm-desc');
       const qtyEl = tr.querySelector('.itm-qty');
       const priceEl = tr.querySelector('.itm-price');
@@ -251,7 +246,6 @@
       if(sumEl) sumEl.textContent = to2(q * p);
     }
 
-    // initial seeded rows if empty
     function seedRows(){
       if(!document.querySelectorAll('#itemsTable tbody tr').length){
         addItemRow('Magnetic Insect Screen',1,50);
@@ -259,7 +253,6 @@
       }
     }
 
-    // date format dd Mon yyyy in Malay
     function formatDateToMalay(dstr){
       if(!dstr) return '';
       const dt = new Date(dstr);
@@ -267,7 +260,6 @@
       return dt.toLocaleDateString('ms-MY',{day:'2-digit',month:'short',year:'numeric'});
     }
 
-    // main preview update
     function updatePreview(){
       const bizName = (document.getElementById('bizName')||{}).value || 'BelantikMaya';
       const bizAddr = (document.getElementById('bizAddr')||{}).value || '';
@@ -298,7 +290,6 @@
       document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
       document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
 
-      // build items
       const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML = '';
       let subtotal = 0;
       document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
@@ -311,7 +302,6 @@
         tbody.appendChild(tr);
       });
 
-      // discount
       const discType = (document.getElementById('discountType')||{}).value || 'none';
       const discVal = Number((document.getElementById('discountValue')||{}).value || 0);
       let discAmt = 0;
@@ -330,56 +320,6 @@
       document.getElementById('rTotal').textContent = to2(total);
     }
 
-    // ensure images loaded before rendering PDF
-    function waitForImages(container){
-      const imgs = Array.from(container.querySelectorAll('img'));
-      const promises = imgs.map(img => {
-        if(img.complete) return Promise.resolve();
-        return new Promise(res => { img.addEventListener('load', res); img.addEventListener('error', res); });
-      });
-      return Promise.all(promises);
-    }
-
-    // print/download PDF handler
-    async function handlePrint(){
-      const receiptEl = document.getElementById('receipt');
-      // ensure preview is fresh
-      updatePreview();
-
-      // wait images
-      await waitForImages(receiptEl);
-
-      // clone to avoid DOM changes
-      const clone = receiptEl.cloneNode(true);
-      const wrapper = document.createElement('div');
-      wrapper.style.boxSizing = 'border-box';
-      wrapper.appendChild(clone);
-      // attach off-screen so styles apply
-      wrapper.style.position = 'fixed';
-      wrapper.style.left = '-9999px';
-      document.body.appendChild(wrapper);
-
-      const opt = {
-        margin: [10,10,10,10],
-        filename: (document.getElementById('invNo').value || 'resit') + '.pdf',
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: false },
-        jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' },
-        enableLinks: true
-      };
-
-      try{
-        await html2pdf().set(opt).from(clone).save();
-      }catch(err){
-        console.error(err);
-        // fallback
-        window.print();
-      }finally{
-        document.body.removeChild(wrapper);
-      }
-    }
-
-    // bind UI events (including dynamic rows)
     function bindLiveInputs(){
       const liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'];
       liveIds.forEach(id => {
@@ -388,7 +328,8 @@
       });
 
       document.getElementById('updatePreview').addEventListener('click', updatePreview);
-      document.getElementById('printBtn').addEventListener('click', handlePrint);
+      document.getElementById('printBtn').addEventListener('click', ()=>{ updatePreview(); window.print(); });
+
       document.getElementById('addRow').addEventListener('click', ()=>{ addItemRow('Perkara',1,0); updatePreview(); });
       document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
     }
