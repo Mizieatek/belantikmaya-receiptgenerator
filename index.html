@@ -5,53 +5,60 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Receipt Generator — BelantikMaya (A5)</title>
   <style>
-    :root{
-      --brand-dark:#1f4d45;
-      --accent:#ff8c42;
-      --muted:#f5f5f5;
-      --text:#111;
-      --paper-w:148mm;
-      --paper-h:210mm;
-      --preview-fixed-w:360px;
-    }
-    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;color:var(--text);background:#faf9f6}
-    .app{display:flex;gap:12px;padding:12px;box-sizing:border-box;height:100%;align-items:flex-start}
-    .panel{flex:1 1 auto;min-width:300px;background:#fff;padding:14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06);overflow:auto}
-    .panel h2{margin:0 0 12px;color:var(--brand-dark)}
-    label{display:block;font-size:13px;margin-top:12px;color:#333}
-    input[type=text], input[type=number], textarea, select, input[type=date]{width:100%;padding:8px 10px;border:1px solid #e6e6e6;border-radius:6px;margin-top:6px;box-sizing:border-box}
-    .row{display:flex;gap:10px}
-    .row .col{flex:1}
-    .actions{display:flex;gap:8px;margin-top:14px}
-    button{background:var(--brand-dark);color:#fff;border:none;padding:10px 12px;border-radius:6px;cursor:pointer}
-    button.secondary{background:#666}
-    .preview-wrap{flex:0 0 var(--preview-fixed-w);display:flex;align-items:flex-start;justify-content:center}
-    .preview-viewport{width:100%;border:1px solid #e9e9e9;padding:8px;background:#fff;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,.04);overflow:auto}
-    .preview-viewport .receipt{width:100%;max-width:var(--preview-fixed-w);height:auto;padding:10px;box-sizing:border-box;background:#fff;position:relative}
-    .receipt.print-size{width:var(--paper-w);height:var(--paper-h);padding:12mm}
-    .receipt .header{display:flex;gap:12px;align-items:center}
-    .logo{width:56px;height:56px;object-fit:contain}
-    .biz{font-weight:700;color:var(--brand-dark);font-size:18px}
-    .muted{color:#666;font-size:12px}
-    .items{margin-top:10px;border-collapse:collapse;width:100%}
-    .items th,.items td{border-bottom:1px dashed #ddd;padding:6px;font-size:12px;text-align:left}
-    .items th{font-size:12px;color:#444}
-    .total-row td{font-weight:700}
-    .foot{position:relative;margin-top:12px;font-size:11px;color:#555}
-    @media print{
-      body{background:#fff}
-      .app>*{display:none}
-      .receipt{box-shadow:none;margin:0}
-      @page{size:148mm 210mm;margin:0}
-    }
-    @media(max-width:900px){
-      .app{flex-direction:column}
-      .panel{order:1}
-      .preview-wrap{order:2;flex-basis:auto;margin-top:6px;flex:1 1 auto}
-      .preview-viewport{width:100%;max-width:100%}
-      .preview-viewport .receipt{max-width:100%;padding:8px}
-    }
-  </style>
+:root{
+  --brand-dark:#1f4d45;
+  --accent:#ff8c42;
+  --muted:#f5f5f5;
+  --text:#111;
+  --paper-w:148mm;
+  --paper-h:210mm;
+  --preview-fixed-w:420px;
+  --logo-size:100px; /* ubah nilai ini untuk besarkan/ciutkan logo */
+}
+html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;color:var(--text);background:#faf9f6}
+.app{display:flex;gap:12px;padding:12px;box-sizing:border-box;height:100%;align-items:flex-start}
+
+/* Desktop: dua kolom sama lebar */
+.panel{flex:1 1 0;min-width:300px;background:#fff;padding:14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06);overflow:auto}
+.preview-wrap{flex:1 1 0;display:flex;align-items:flex-start;justify-content:center}
+
+/* preview viewport menyesuaikan lebar kolum tetapi skala A5 di dalamnya */
+.preview-viewport{width:100%;border:1px solid #e9e9e9;padding:8px;background:#fff;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,.04);overflow:auto}
+.preview-viewport .receipt{width:100%;max-width:100%;height:auto;padding:10px;box-sizing:border-box;background:#fff;position:relative}
+
+/* logo size control */
+.logo{width:var(--logo-size);height:var(--logo-size);object-fit:contain}
+
+/* print A5 remains unchanged */
+.receipt.print-size{width:var(--paper-w);height:var(--paper-h);padding:12mm}
+.receipt .header{display:flex;gap:12px;align-items:center}
+.biz{font-weight:700;color:var(--brand-dark);font-size:18px}
+.muted{color:#666;font-size:12px}
+
+.items{margin-top:10px;border-collapse:collapse;width:100%}
+.items th,.items td{border-bottom:1px dashed #ddd;padding:6px;font-size:12px;text-align:left}
+.items th{font-size:12px;color:#444}
+.total-row td{font-weight:700}
+.foot{position:relative;margin-top:12px;font-size:11px;color:#555}
+
+/* print: open a new page with real A5 dimensions */
+@media print{
+  body{background:#fff}
+  .app>*{display:none}
+  .receipt{box-shadow:none;margin:0}
+  @page{size:148mm 210mm;margin:0}
+}
+
+/* mobile: stack vertically, preview full width */
+@media(max-width:900px){
+  .app{flex-direction:column}
+  .panel{order:1}
+  .preview-wrap{order:2;flex-basis:auto;margin-top:6px;flex:1 1 auto}
+  .preview-viewport{width:100%;max-width:100%}
+  .preview-viewport .receipt{max-width:100%;padding:8px}
+}
+</style>
+
 </head>
 <body>
   <div class="app">
@@ -187,110 +194,143 @@
   </div>
 
   <script>
-    const to2 = v=>Number(v||0).toFixed(2);
-    function escapeHtml(unsafe){return (unsafe||'').toString().replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"}[m];});}
+document.addEventListener('DOMContentLoaded', function(){
+  const to2 = v=>Number(v||0).toFixed(2);
+  function escapeHtml(unsafe){ return (unsafe||'').toString().replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m];}); }
 
-    // add item row function
-    const itemsBody = document.querySelector('#itemsTable tbody');
-    function addItemRow(desc='',qty=1,price=0){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="itm-desc" type="text" value="${desc}"/></td>
-        <td><input class="itm-qty" type="number" min="1" value="${qty}"/></td>
-        <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}"/></td>
-        <td class="itm-sum">${to2(qty*price)}</td>
-        <td><button class="del">-</button></td>
-      `;
-      itemsBody.appendChild(tr);
+  const itemsBody = document.querySelector('#itemsTable tbody');
 
-      // attach listeners
-      tr.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',updateRow));
-      tr.querySelector('.del').addEventListener('click',()=>{tr.remove();updateRow();});
-      updateRow();
-    }
+  function addItemRow(desc='', qty=1, price=0){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="itm-desc" type="text" value="${desc}" /></td>
+      <td><input class="itm-qty" type="number" min="1" value="${qty}" /></td>
+      <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}" /></td>
+      <td class="itm-sum">${to2(qty*price)}</td>
+      <td><button type="button" class="del">-</button></td>
+    `;
+    itemsBody.appendChild(tr);
 
-    document.getElementById('addRow').addEventListener('click',()=>addItemRow('Perkara',1,0));
-    document.getElementById('resetRows').addEventListener('click',()=>{itemsBody.innerHTML='';updateRow();});
+    // bind events for inputs inside this row
+    const descEl = tr.querySelector('.itm-desc');
+    const qtyEl = tr.querySelector('.itm-qty');
+    const priceEl = tr.querySelector('.itm-price');
+    const delBtn = tr.querySelector('.del');
 
-    function updateRow(){
-      document.querySelectorAll('#itemsTable tbody tr').forEach(r=>{
-        const q = Number(r.querySelector('.itm-qty').value||0);
-        const p = Number(r.querySelector('.itm-price').value||0);
-        r.querySelector('.itm-sum').textContent = to2(q*p);
+    [descEl, qtyEl, priceEl].forEach(el => {
+      el.addEventListener('input', ()=> {
+        updateRowTotalsFor(tr);
+        updatePreview();
       });
-      updatePreview();
-    }
-
-    // update preview
-    function updatePreview(){
-      // business info
-      document.getElementById('rBizName').textContent = document.getElementById('bizName').value || 'BelantikMaya';
-      document.getElementById('rBizAddr').textContent = document.getElementById('bizAddr').value || '';
-      document.getElementById('rBizPhone').textContent = document.getElementById('bizPhone').value || '';
-      document.getElementById('rBizWebsite').textContent = document.getElementById('bizWebsite').value || '';
-      document.getElementById('rBizEmail').textContent = document.getElementById('bizEmail').value || '';
-
-      // invoice number
-      const invField = document.getElementById('invNo').value.trim();
-      const invNo = invField || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
-      document.getElementById('rInv').textContent = invNo;
-
-      // date
-      const dateVal = document.getElementById('date').value;
-      document.getElementById('rDate').textContent = dateVal || new Date().toISOString().slice(0,10);
-
-      document.getElementById('rPay').textContent = document.getElementById('payMethod').value;
-
-      // customer info
-      const custName = document.getElementById('custName').value.trim();
-      const custEmail = document.getElementById('custEmail').value.trim();
-      const custPhone = document.getElementById('custPhone').value.trim();
-      document.getElementById('rCustName').textContent = custName || '-';
-      document.getElementById('rCustEmail').textContent = custEmail ? ('Email: ' + custEmail) : '';
-      document.getElementById('rCustPhone').textContent = custPhone ? ('Tel: ' + custPhone) : '';
-
-      // items and totals
-      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML='';
-      let subtotal=0;
-      document.querySelectorAll('#itemsTable tbody tr').forEach(r=>{
-        const d = r.querySelector('.itm-desc').value || '';
-        const q = Number(r.querySelector('.itm-qty').value||0);
-        const p = Number(r.querySelector('.itm-price').value||0);
-        const s = q*p; subtotal+=s;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td style="font-size:12px">${escapeHtml(d)}</td><td style="text-align:right">${q}</td><td style="text-align:right">${to2(p)}</td><td style="text-align:right">${to2(s)}</td>`;
-        tbody.appendChild(tr);
-      });
-      document.getElementById('rSubtotal').textContent = to2(subtotal);
-      document.getElementById('rDiscount').textContent = '0.00';
-      document.getElementById('rTotal').textContent = to2(subtotal);
-    }
-
-    // print handler
-    document.getElementById('printBtn').addEventListener('click',()=>{
-      // open new window with real A5
-      const w = window.open('', '_blank');
-      const doc = w.document;
-      const content = document.getElementById('receipt').outerHTML;
-      doc.open();
-      doc.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Resit</title><style>@page{size:148mm 210mm;margin:0}body{margin:0;padding:0;font-family:Arial} .receipt{width:148mm;height:210mm;padding:12mm;box-sizing:border-box} .logo{width:56px;height:56px;object-fit:contain} table{width:100%;border-collapse:collapse} td,th{padding:6px;border-bottom:1px dashed #ddd;font-size:12px}</style></head><body>${content}</body></html>`);
-      doc.close();
-      w.focus();
-      setTimeout(()=>{w.print();},500);
     });
 
-    document.getElementById('updatePreview').addEventListener('click',updatePreview);
+    delBtn.addEventListener('click', ()=> {
+      tr.remove();
+      updatePreview();
+    });
 
-    // seed rows
+    updateRowTotalsFor(tr);
+  }
+
+  function updateRowTotalsFor(row){
+    const q = Number(row.querySelector('.itm-qty').value || 0);
+    const p = Number(row.querySelector('.itm-price').value || 0);
+    const sumEl = row.querySelector('.itm-sum');
+    if(sumEl) sumEl.textContent = to2(q * p);
+  }
+
+  // wire up controls
+  const addRowBtn = document.getElementById('addRow');
+  const resetRowsBtn = document.getElementById('resetRows');
+  addRowBtn && addRowBtn.addEventListener('click', ()=> addItemRow('Perkara',1,0));
+  resetRowsBtn && resetRowsBtn.addEventListener('click', ()=> { itemsBody.innerHTML=''; updatePreview(); });
+
+  // update preview function
+  function updatePreview(){
+    // business
+    const bizName = (document.getElementById('bizName') || {}).value || 'BelantikMaya';
+    const bizAddr = (document.getElementById('bizAddr') || {}).value || '';
+    const bizPhone = (document.getElementById('bizPhone') || {}).value || '';
+    const bizWebsite = (document.getElementById('bizWebsite') || {}).value || '';
+    const bizEmail = (document.getElementById('bizEmail') || {}).value || '';
+
+    document.getElementById('rBizName').textContent = bizName;
+    document.getElementById('rBizAddr').textContent = bizAddr;
+    document.getElementById('rBizPhone').textContent = bizPhone;
+    document.getElementById('rBizWebsite').textContent = bizWebsite;
+    document.getElementById('rBizEmail').textContent = bizEmail;
+
+    // invoice number (override or auto)
+    const invField = (document.getElementById('invNo') || {}).value || '';
+    const invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
+    document.getElementById('rInv').textContent = invNo;
+
+    // date
+    const dateVal = (document.getElementById('date') || {}).value || new Date().toISOString().slice(0,10);
+    document.getElementById('rDate').textContent = dateVal;
+
+    // payment
+    const payMethod = (document.getElementById('payMethod') || {}).value || '';
+    document.getElementById('rPay').textContent = payMethod;
+
+    // customer
+    const custName = (document.getElementById('custName') || {}).value || '';
+    const custEmail = (document.getElementById('custEmail') || {}).value || '';
+    const custPhone = (document.getElementById('custPhone') || {}).value || '';
+    document.getElementById('rCustName').textContent = custName || '-';
+    document.getElementById('rCustEmail').textContent = custEmail ? ('Email: ' + custEmail) : '';
+    document.getElementById('rCustPhone').textContent = custPhone ? ('Tel: ' + custPhone) : '';
+
+    // items table build
+    const tbody = document.querySelector('#rItems tbody');
+    tbody.innerHTML = '';
+    let subtotal = 0;
+    document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
+      const d = (r.querySelector('.itm-desc') || {}).value || '';
+      const q = Number((r.querySelector('.itm-qty') || {}).value || 0);
+      const p = Number((r.querySelector('.itm-price') || {}).value || 0);
+      const s = q * p;
+      subtotal += s;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td style="font-size:12px">${escapeHtml(d)}</td><td style="text-align:right">${q}</td><td style="text-align:right">${to2(p)}</td><td style="text-align:right">${to2(s)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('rSubtotal').textContent = to2(subtotal);
+    document.getElementById('rDiscount').textContent = '0.00';
+    document.getElementById('rTotal').textContent = to2(subtotal);
+  }
+
+  // print handler (A5)
+  const printBtn = document.getElementById('printBtn');
+  printBtn && printBtn.addEventListener('click', ()=>{
+    const w = window.open('', '_blank');
+    const doc = w.document;
+    const content = document.getElementById('receipt').outerHTML;
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Resit</title><style>@page{size:148mm 210mm;margin:0}body{margin:0;padding:0;font-family:Arial} .receipt{width:148mm;height:210mm;padding:12mm;box-sizing:border-box} .logo{width:56px;height:56px;object-fit:contain} table{width:100%;border-collapse:collapse} td,th{padding:6px;border-bottom:1px dashed #ddd;font-size:12px}</style></head><body>${content}</body></html>`);
+    doc.close();
+    w.focus();
+    setTimeout(()=>{ w.print(); }, 500);
+  });
+
+  // live-bind inputs to updatePreview
+  const liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod'];
+  liveIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', updatePreview);
+  });
+
+  // seed two rows if none exist
+  if(!document.querySelectorAll('#itemsTable tbody tr').length){
     addItemRow('Magnetic Insect Screen',1,50);
     addItemRow('Installation',1,30);
-    updatePreview();
+  }
 
-    // ensure preview updates live when business/customer fields change
-    ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.addEventListener('input', updatePreview);
-    });
-  </script>
+  // initial render
+  updatePreview();
+});
+</script>
+
 </body>
 </html>
