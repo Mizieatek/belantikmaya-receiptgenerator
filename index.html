@@ -237,15 +237,16 @@
     const itemsBody = document.querySelector('#itemsTable tbody');
 
     function addItemRow(desc = '', qty = 1, price = 0) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = \`
-        <td><input class="itm-desc" type="text" value="\${escapeHtml(desc)}" /></td>
-        <td><input class="itm-qty" type="number" min="1" value="\${qty}" /></td>
-        <td><input class="itm-price" type="number" min="0" step="0.01" value="\${price}" /></td>
-        <td class="itm-sum">\${to2(qty * price)}</td>
-        <td><button type="button" class="del">-</button></td>
-      \`;
-      itemsBody.appendChild(tr);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="itm-desc" type="text" value="${escapeHtml(desc)}" /></td>
+    <td><input class="itm-qty" type="number" min="1" value="${qty}" /></td>
+    <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}" /></td>
+    <td class="itm-sum">${to2(qty * price)}</td>
+    <td><button type="button" class="del">-</button></td>
+  `;
+  itemsBody.appendChild(tr);
+
 
       const descEl = tr.querySelector('.itm-desc');
       const qtyEl = tr.querySelector('.itm-qty');
