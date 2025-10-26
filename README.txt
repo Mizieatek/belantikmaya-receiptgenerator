@@ -1,17 +1,15 @@
 
-Receipt Generator — BelantikMaya
---------------------------------
-Files in this package:
-- index.html         : main receipt generator (open in browser)
-- logo.webp / logo.svg : logo file (replace with your own logo if needed)
+Receipt Generator — BelantikMaya (PDF-ready)
+--------------------------------------------
+Files:
+- index.html : Receipt generator with 'Muat Turun PDF' using html2pdf.js
+- logo.webp  : logo (replace if needed) / logo.svg fallback
 
-How to use:
-1. Extract the zip and open index.html in a browser to test locally.
-2. To deploy to Netlify:
-   - Create a new repo (e.g., belantikmaya-receipt) and push these files.
-   - Netlify: Add new site -> Import from Git -> select repo. No build command needed for static site.
-   - If you want it at `https://receipt.belantikmaya.com`, add a CNAME record as instructed later.
+Usage:
+1. Extract files and open index.html to test locally.
+2. Fill form, then click 'Muat Turun PDF' to generate A5 PDF that matches preview.
+3. To deploy to Netlify, create a repo and push these files. No build required for static site.
 
 Notes:
-- The preview is scaled on-screen for convenience but print uses real A5 sizing.
-- If you want direct PDF export (client-side), tell me and I can add html2pdf/jsPDF integration.
+- html2pdf renders the preview element to canvas then to PDF. Ensure logo is accessible (CORS) if loading from remote URL.
+- If you need server-side perfect fidelity (fonts/kerning), consider Puppeteer or wkhtmltopdf.

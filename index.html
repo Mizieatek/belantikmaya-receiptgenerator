@@ -18,7 +18,6 @@
     html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;color:var(--text);background:#faf9f6}
     .app{display:flex;gap:var(--col-gap);padding:12px;box-sizing:border-box;min-height:100vh}
     .col{flex:1 1 0;min-width:300px;background:#fff;padding:14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06);box-sizing:border-box}
-
     label{display:block;font-size:13px;margin-top:12px;color:#333}
     input[type=text], input[type=number], textarea, select, input[type=date]{width:100%;padding:8px 10px;border:1px solid #e6e6e6;border-radius:6px;margin-top:6px;box-sizing:border-box}
     .row{display:flex;gap:10px}
@@ -26,11 +25,9 @@
     button{background:var(--brand-dark);color:#fff;border:none;padding:10px 12px;border-radius:6px;cursor:pointer}
     button.secondary{background:#666}
     .actions{display:flex;gap:8px;margin-top:12px}
-
     .preview-viewport{width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start}
     .receipt{width:100%;max-width:520px;background:#fff;padding:16px;box-sizing:border-box;position:relative;border:1px solid #eee}
     .receipt.print-size{width:var(--paper-w);height:var(--paper-h);padding:12mm}
-
     .header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
     .company{display:flex;gap:12px;align-items:center}
     .logo{width:var(--logo-size);height:var(--logo-size);object-fit:contain}
@@ -38,17 +35,14 @@
     .company-info .biz{font-weight:700;color:var(--brand-dark);font-size:16px}
     .meta{font-size:13px;text-align:right}
     .meta div{color:#444}
-
     .cust-inv{display:flex;justify-content:space-between;gap:12px;margin-top:12px}
     .cust{flex:1}
     .inv{flex:1;text-align:right}
     .cust .label{font-weight:700;margin-bottom:6px}
-
     table.items{width:100%;border-collapse:collapse;margin-top:12px}
     table.items th, table.items td{padding:8px;border-bottom:1px dashed #ddd;font-size:13px}
     table.items th{text-align:left}
     table.items td.numeric{text-align:right}
-
     .totals{margin-top:8px;display:flex;justify-content:flex-end}
     .totals table{width:320px;border-collapse:collapse}
     .totals td{padding:6px;font-size:13px}
@@ -57,9 +51,7 @@
     .totals .subtotal{font-weight:600}
     .totals .discount{font-weight:600}
     .totals .grand{font-weight:900;font-size:15px}
-
     .foot{margin-top:12px;font-size:12px;color:#555}
-
     @media(max-width:900px){
       .app{flex-direction:column}
       .header{flex-direction:column;align-items:flex-start}
@@ -68,7 +60,6 @@
       .inv{text-align:left}
       .receipt{max-width:100%;padding:12px}
     }
-
     @media print{
       body{background:#fff}
       .app>*{display:none}
@@ -161,7 +152,7 @@
 
       <div class="actions">
         <button id="updatePreview">Kemas kini Preview</button>
-        <button id="printBtn" style="background:var(--accent)">Cetak / PDF</button>
+        <button id="printBtn" style="background:var(--accent)">Muat Turun PDF</button>
       </div>
 
     </div>
@@ -196,7 +187,6 @@
               <div id="rCustPhone"></div>
             </div>
             <div class="inv">
-              <!-- intentionally left for summary if needed -->
             </div>
           </div>
 
@@ -216,10 +206,13 @@
     </div>
   </div>
 
+  <!-- html2pdf bundle (includes html2canvas & jsPDF) -->
+  <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
+
   <script>
   document.addEventListener('DOMContentLoaded', function(){
     const to2 = v=>Number(v||0).toFixed(2);
-    function escapeHtml(unsafe){ return (unsafe||'').toString().replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":"&#39;"}[m];}); }
+    function escapeHtml(unsafe){ return (unsafe||'').toString().replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"}[m];}); }
 
     const itemsBody = document.querySelector('#itemsTable tbody');
 
@@ -263,7 +256,6 @@
     }
 
     function updatePreview(){
-      // business
       const bizName = (document.getElementById('bizName')||{}).value || 'BelantikMaya';
       const bizAddr = (document.getElementById('bizAddr')||{}).value || '';
       const bizPhone = (document.getElementById('bizPhone')||{}).value || '';
@@ -276,20 +268,16 @@
       document.getElementById('rBizWebsite').textContent = bizWebsite;
       document.getElementById('rBizEmail').textContent = bizEmail;
 
-      // invoice
       const invField = (document.getElementById('invNo')||{}).value || '';
       const invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
       document.getElementById('rInv').textContent = invNo;
 
-      // date (format to day-month-year Malay)
       const dateVal = (document.getElementById('date')||{}).value || new Date().toISOString().slice(0,10);
       document.getElementById('rDate').textContent = formatDateToMalay(dateVal);
 
-      // payment
       const pay = (document.getElementById('payMethod')||{}).value || '';
       document.getElementById('rPay').textContent = pay;
 
-      // customer
       const cName = (document.getElementById('custName')||{}).value || '';
       const cEmail = (document.getElementById('custEmail')||{}).value || '';
       const cPhone = (document.getElementById('custPhone')||{}).value || '';
@@ -297,7 +285,6 @@
       document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
       document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
 
-      // items
       const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML='';
       let subtotal = 0;
       document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
@@ -310,7 +297,6 @@
         tbody.appendChild(tr);
       });
 
-      // discount calculation
       const discType = (document.getElementById('discountType')||{}).value || 'none';
       const discVal = Number((document.getElementById('discountValue')||{}).value || 0);
       let discAmt = 0;
@@ -327,20 +313,52 @@
       document.getElementById('rSubtotal').textContent = to2(subtotal);
       document.getElementById('rDiscount').textContent = '-' + to2(discAmt);
       document.getElementById('rTotal').textContent = to2(total);
-
-      // visually emphasize totals via classes are handled by CSS
     }
 
-    // print
-    document.getElementById('printBtn').addEventListener('click', ()=>{
-      const w = window.open('', '_blank');
-      const doc = w.document; const content = document.getElementById('receipt').outerHTML;
-      doc.open();
-      doc.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Resit</title><style>@page{size:148mm 210mm;margin:0}body{margin:0;padding:0;font-family:Arial} .receipt{width:148mm;height:210mm;padding:12mm;box-sizing:border-box} table{width:100%;border-collapse:collapse} td,th{padding:6px;border-bottom:1px dashed #ddd;font-size:12px}</style></head><body>${content}</body></html>`);
-      doc.close(); w.focus(); setTimeout(()=>{ w.print(); }, 500);
+    // Helper: ensure images inside element loaded
+    function waitForImages(container) {
+      const imgs = Array.from(container.querySelectorAll('img'));
+      const promises = imgs.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(res => { img.addEventListener('load', res); img.addEventListener('error', res); });
+      });
+      return Promise.all(promises);
+    }
+
+    document.getElementById('printBtn').addEventListener('click', async function () {
+      const receiptEl = document.getElementById('receipt');
+
+      // wait for images to load
+      await waitForImages(receiptEl);
+
+      // clone and wrap
+      const clone = receiptEl.cloneNode(true);
+      const wrapper = document.createElement('div');
+      wrapper.style.boxSizing = 'border-box';
+      wrapper.appendChild(clone);
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      document.body.appendChild(wrapper);
+
+      const opt = {
+        margin: [10, 10, 10, 10], // mm
+        filename: (document.getElementById('invNo').value || 'resit') + '.pdf',
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: false, logging: false },
+        jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' },
+        enableLinks: true
+      };
+
+      try {
+        await html2pdf().set(opt).from(clone).save();
+      } catch (e) {
+        console.error('html2pdf error:', e);
+        window.print();
+      } finally {
+        document.body.removeChild(wrapper);
+      }
     });
 
-    // bindings
     ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.addEventListener('input', updatePreview);
@@ -349,7 +367,6 @@
     document.getElementById('addRow').addEventListener('click', ()=> addItemRow('Perkara',1,0));
     document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
 
-    // seed
     if(!document.querySelectorAll('#itemsTable tbody tr').length){
       addItemRow('Magnetic Insect Screen',1,50);
       addItemRow('Installation',1,30);
