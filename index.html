@@ -208,137 +208,155 @@
     </div>
   </div>
 
-  <script>
-  document.addEventListener('DOMContentLoaded', function(){
-    const to2 = v=>Number(v||0).toFixed(2);
-    function escapeHtml(unsafe){ return (unsafe||'').toString().replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"}[m];}); }
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  function to2(v) { return Number(v || 0).toFixed(2); }
+  function escapeHtml(s) { return (s || '').toString().replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
 
-    const itemsBody = document.querySelector('#itemsTable tbody');
+  var itemsBody = document.querySelector('#itemsTable tbody');
 
-    function addItemRow(desc='', qty=1, price=0){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="itm-desc" type="text" value="${desc}" /></td>
-        <td><input class="itm-qty" type="number" min="1" value="${qty}" /></td>
-        <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}" /></td>
-        <td class="itm-sum">${to2(qty*price)}</td>
-        <td><button type="button" class="del">-</button></td>
-      `;
-      itemsBody.appendChild(tr);
+  function addItemRow(desc, qty, price) {
+    desc = desc || '';
+    qty = (typeof qty === 'number') ? qty : 1;
+    price = (typeof price === 'number') ? price : 0;
+    var tr = document.createElement('tr');
 
-      const descEl = tr.querySelector('.itm-desc');
-      const qtyEl = tr.querySelector('.itm-qty');
-      const priceEl = tr.querySelector('.itm-price');
-      const delBtn = tr.querySelector('.del');
+    tr.innerHTML = ''
+      + '<td><input class="itm-desc" type="text" value="' + escapeHtml(desc) + '"></td>'
+      + '<td><input class="itm-qty" type="number" min="1" value="' + qty + '"></td>'
+      + '<td><input class="itm-price" type="number" min="0" step="0.01" value="' + price + '"></td>'
+      + '<td class="itm-sum">' + to2(qty * price) + '</td>'
+      + '<td><button type="button" class="del">-</button></td>';
 
-      [descEl, qtyEl, priceEl].forEach(el => {
-        el.addEventListener('input', ()=>{ updateRowTotalsFor(tr); updatePreview(); });
-      });
-      delBtn.addEventListener('click', ()=>{ tr.remove(); updatePreview(); });
+    itemsBody.appendChild(tr);
 
-      updateRowTotalsFor(tr);
+    var descEl = tr.querySelector('.itm-desc');
+    var qtyEl = tr.querySelector('.itm-qty');
+    var priceEl = tr.querySelector('.itm-price');
+    var delBtn = tr.querySelector('.del');
+
+    function onRowChange() {
+      var q = Number(qtyEl.value || 0);
+      var p = Number(priceEl.value || 0);
+      var sum = q * p;
+      var sumEl = tr.querySelector('.itm-sum');
+      if (sumEl) sumEl.textContent = to2(sum);
+      updatePreview();
     }
 
-    function updateRowTotalsFor(row){
-      const q = Number(row.querySelector('.itm-qty').value || 0);
-      const p = Number(row.querySelector('.itm-price').value || 0);
-      const sumEl = row.querySelector('.itm-sum');
-      if(sumEl) sumEl.textContent = to2(q * p);
+    descEl.addEventListener('input', updatePreview);
+    qtyEl.addEventListener('input', onRowChange);
+    priceEl.addEventListener('input', onRowChange);
+    delBtn.addEventListener('click', function () { tr.parentNode.removeChild(tr); updatePreview(); });
+  }
+
+  function seedRows() {
+    if (document.querySelectorAll('#itemsTable tbody tr').length === 0) {
+      addItemRow('Magnetic Insect Screen', 1, 50);
+      addItemRow('Installation', 1, 30);
+    }
+  }
+
+  function formatDateToMalay(dstr) {
+    if (!dstr) return '';
+    var dt = new Date(dstr);
+    if (isNaN(dt.getTime())) return dstr;
+    return dt.toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function updatePreview() {
+    var bizName = (document.getElementById('bizName') || {}).value || 'BelantikMaya';
+    var bizAddr = (document.getElementById('bizAddr') || {}).value || '';
+    var bizPhone = (document.getElementById('bizPhone') || {}).value || '';
+    var bizWebsite = (document.getElementById('bizWebsite') || {}).value || '';
+    var bizEmail = (document.getElementById('bizEmail') || {}).value || '';
+
+    document.getElementById('rBizName').textContent = bizName;
+    document.getElementById('rBizAddr').textContent = bizAddr;
+    document.getElementById('rBizPhone').textContent = bizPhone;
+    document.getElementById('rBizWebsite').textContent = bizWebsite;
+    document.getElementById('rBizEmail').textContent = bizEmail;
+
+    var invField = (document.getElementById('invNo') || {}).value || '';
+    var invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random() * 900 + 100)));
+    document.getElementById('rInv').textContent = invNo;
+
+    var dateVal = (document.getElementById('date') || {}).value || new Date().toISOString().slice(0,10);
+    document.getElementById('rDate').textContent = formatDateToMalay(dateVal);
+
+    var pay = (document.getElementById('payMethod') || {}).value || '';
+    document.getElementById('rPay').textContent = pay;
+
+    var cName = (document.getElementById('custName') || {}).value || '';
+    var cEmail = (document.getElementById('custEmail') || {}).value || '';
+    var cPhone = (document.getElementById('custPhone') || {}).value || '';
+    document.getElementById('rCustName').textContent = cName || '-';
+    document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
+    document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
+
+    // build items table in preview
+    var tbody = document.querySelector('#rItems tbody');
+    tbody.innerHTML = '';
+    var subtotal = 0;
+    var rows = document.querySelectorAll('#itemsTable tbody tr');
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var d = (r.querySelector('.itm-desc') || {}).value || '';
+      var q = Number((r.querySelector('.itm-qty') || {}).value || 0);
+      var p = Number((r.querySelector('.itm-price') || {}).value || 0);
+      var s = q * p;
+      subtotal += s;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(d) + '</td><td class="numeric">' + q + '</td><td class="numeric">' + to2(p) + '</td><td class="numeric">' + to2(s) + '</td>';
+      tbody.appendChild(tr);
     }
 
-    function seedRows(){
-      if(!document.querySelectorAll('#itemsTable tbody tr').length){
-        addItemRow('Magnetic Insect Screen',1,50);
-        addItemRow('Installation',1,30);
-      }
+    // discount
+    var discType = (document.getElementById('discountType') || {}).value || 'none';
+    var discVal = Number((document.getElementById('discountValue') || {}).value || 0);
+    var discAmt = 0;
+    if (discType === 'percent') {
+      discAmt = subtotal * (discVal / 100);
+    } else if (discType === 'amount') {
+      discAmt = discVal;
     }
+    if (discAmt < 0) discAmt = 0;
+    if (discAmt > subtotal) discAmt = subtotal;
 
-    function formatDateToMalay(dstr){
-      if(!dstr) return '';
-      const dt = new Date(dstr);
-      if(isNaN(dt)) return dstr;
-      return dt.toLocaleDateString('ms-MY',{day:'2-digit',month:'short',year:'numeric'});
+    var total = subtotal - discAmt;
+    document.getElementById('rSubtotal').textContent = to2(subtotal);
+    document.getElementById('rDiscount').textContent = discAmt ? ('-' + to2(discAmt)) : '0.00';
+    document.getElementById('rTotal').textContent = to2(total);
+  }
+
+  function bindLiveInputs() {
+    var liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'];
+    for (var i = 0; i < liveIds.length; i++) {
+      var el = document.getElementById(liveIds[i]);
+      if (el) el.addEventListener('input', updatePreview);
     }
+    var btnPreview = document.getElementById('updatePreview');
+    if (btnPreview) btnPreview.addEventListener('click', updatePreview);
 
-    function updatePreview(){
-      const bizName = (document.getElementById('bizName')||{}).value || 'BelantikMaya';
-      const bizAddr = (document.getElementById('bizAddr')||{}).value || '';
-      const bizPhone = (document.getElementById('bizPhone')||{}).value || '';
-      const bizWebsite = (document.getElementById('bizWebsite')||{}).value || '';
-      const bizEmail = (document.getElementById('bizEmail')||{}).value || '';
+    var btnPrint = document.getElementById('printBtn');
+    if (btnPrint) btnPrint.addEventListener('click', function () {
+      updatePreview();
+      // small delay to ensure DOM repaint
+      setTimeout(function () { window.print(); }, 120);
+    });
 
-      document.getElementById('rBizName').textContent = bizName;
-      document.getElementById('rBizAddr').textContent = bizAddr;
-      document.getElementById('rBizPhone').textContent = bizPhone;
-      document.getElementById('rBizWebsite').textContent = bizWebsite;
-      document.getElementById('rBizEmail').textContent = bizEmail;
+    var addBtn = document.getElementById('addRow');
+    if (addBtn) addBtn.addEventListener('click', function () { addItemRow('Perkara',1,0); });
 
-      const invField = (document.getElementById('invNo')||{}).value || '';
-      const invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
-      document.getElementById('rInv').textContent = invNo;
+    var resetBtn = document.getElementById('resetRows');
+    if (resetBtn) resetBtn.addEventListener('click', function () { itemsBody.innerHTML = ''; updatePreview(); });
+  }
 
-      const dateVal = (document.getElementById('date')||{}).value || new Date().toISOString().slice(0,10);
-      document.getElementById('rDate').textContent = formatDateToMalay(dateVal);
-
-      const pay = (document.getElementById('payMethod')||{}).value || '';
-      document.getElementById('rPay').textContent = pay;
-
-      const cName = (document.getElementById('custName')||{}).value || '';
-      const cEmail = (document.getElementById('custEmail')||{}).value || '';
-      const cPhone = (document.getElementById('custPhone')||{}).value || '';
-      document.getElementById('rCustName').textContent = cName || '-';
-      document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
-      document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
-
-      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML = '';
-      let subtotal = 0;
-      document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
-        const d = (r.querySelector('.itm-desc')||{}).value || '';
-        const q = Number((r.querySelector('.itm-qty')||{}).value || 0);
-        const p = Number((r.querySelector('.itm-price')||{}).value || 0);
-        const s = q * p; subtotal += s;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(d)}</td><td class="numeric">${q}</td><td class="numeric">${to2(p)}</td><td class="numeric">${to2(s)}</td>`;
-        tbody.appendChild(tr);
-      });
-
-      const discType = (document.getElementById('discountType')||{}).value || 'none';
-      const discVal = Number((document.getElementById('discountValue')||{}).value || 0);
-      let discAmt = 0;
-      if(discType === 'percent'){
-        discAmt = subtotal * (discVal/100);
-      } else if(discType === 'amount'){
-        discAmt = discVal;
-      }
-      if(discAmt < 0) discAmt = 0;
-      if(discAmt > subtotal) discAmt = subtotal;
-
-      const total = subtotal - discAmt;
-
-      document.getElementById('rSubtotal').textContent = to2(subtotal);
-      document.getElementById('rDiscount').textContent = discAmt ? ('-' + to2(discAmt)) : '0.00';
-      document.getElementById('rTotal').textContent = to2(total);
-    }
-
-    function bindLiveInputs(){
-      const liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'];
-      liveIds.forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.addEventListener('input', updatePreview);
-      });
-
-      document.getElementById('updatePreview').addEventListener('click', updatePreview);
-      document.getElementById('printBtn').addEventListener('click', ()=>{ updatePreview(); window.print(); });
-
-      document.getElementById('addRow').addEventListener('click', ()=>{ addItemRow('Perkara',1,0); updatePreview(); });
-      document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
-    }
-
-    // init
-    seedRows();
-    bindLiveInputs();
-    updatePreview();
-  });
-  </script>
+  // initialize
+  seedRows();
+  bindLiveInputs();
+  updatePreview();
+});
+</script>
 </body>
 </html>
