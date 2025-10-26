@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Receipt Generator — BelantikMaya (A4/A5)</title>
+  <title>Receipt Generator — BelantikMaya (A4)</title>
   <style>
     :root{
       --brand-dark:#1f4d45;
@@ -46,7 +46,7 @@
     .totals .subtotal{font-weight:600}
     .totals .discount{font-weight:600}
     .totals .grand{font-weight:900;font-size:16px}
-    .foot{margin-top:12px;font-size:12px;color:#555}
+    .foot{margin:12px 0 0 0;font-size:12px;color:#555}
 
     /* PRINT RULE: when fallback uses window.print(), show only #receipt */
     @media print {
@@ -56,7 +56,6 @@
       @page { size: A4; margin: 0; }
     }
 
-    /* utility: class toggle for print-only fallback */
     .print-only-receipt * { display: none !important; }
     .print-only-receipt #receipt, .print-only-receipt #receipt * { display: block !important; visibility: visible !important; }
 
@@ -153,7 +152,7 @@
       </div>
 
       <label>Pilihan Saiz Kertas</label>
-      <select id="paperSize"><option value="a4">A4 (210 × 297 mm)</option><option value="a5">A5 (148 × 210 mm)</option></select>
+      <select id="paperSize"><option value="a4" selected>A4 (210 × 297 mm)</option><option value="a5">A5 (148 × 210 mm)</option></select>
 
       <div class="actions">
         <button id="updatePreview">Kemas kini Preview</button>
@@ -210,10 +209,28 @@
     </div>
   </div>
 
-  <!-- html2pdf bundle (client-side renderer) -->
-  <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
+  <!-- load local html2pdf bundle if present; otherwise loader will attempt CDN -->
+  <script>
+    (function loadHtml2Pdf() {
+      // try local first
+      var local = document.createElement('script');
+      local.src = './js/html2pdf.bundle.min.js';
+      local.onload = function(){ console.info('Loaded local html2pdf.bundle.min.js'); };
+      local.onerror = function(){
+        console.warn('Local html2pdf not found; will try CDN loader.');
+        // attempt CDN loader
+        var cdn = document.createElement('script');
+        cdn.src = './js/html2pdf.loader.js'; // loader tries CDN
+        cdn.onload = function(){ console.info('Loader executed'); };
+        cdn.onerror = function(){ console.error('Loader failed to load. Please add js/html2pdf.bundle.min.js to your repo.'); };
+        document.head.appendChild(cdn);
+      };
+      document.head.appendChild(local);
+    })();
+  </script>
 
   <script>
+  /* Main app script (kept inline for simplicity) */
   document.addEventListener('DOMContentLoaded', function () {
     const to2 = v => Number(v || 0).toFixed(2);
     const escapeHtml = s => String(s || '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -221,13 +238,13 @@
 
     function addItemRow(desc = '', qty = 1, price = 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="itm-desc" type="text" value="${escapeHtml(desc)}" /></td>
-        <td><input class="itm-qty" type="number" min="1" value="${qty}" /></td>
-        <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}" /></td>
-        <td class="itm-sum">${to2(qty * price)}</td>
+      tr.innerHTML = \`
+        <td><input class="itm-desc" type="text" value="\${escapeHtml(desc)}" /></td>
+        <td><input class="itm-qty" type="number" min="1" value="\${qty}" /></td>
+        <td><input class="itm-price" type="number" min="0" step="0.01" value="\${price}" /></td>
+        <td class="itm-sum">\${to2(qty * price)}</td>
         <td><button type="button" class="del">-</button></td>
-      `;
+      \`;
       itemsBody.appendChild(tr);
 
       const descEl = tr.querySelector('.itm-desc');
@@ -293,7 +310,7 @@
         const p = Number((r.querySelector('.itm-price') || {}).value || 0);
         const s = q * p; subtotal += s;
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(d)}</td><td class="numeric">${q}</td><td class="numeric">${to2(p)}</td><td class="numeric">${to2(s)}</td>`;
+        tr.innerHTML = '<td>' + escapeHtml(d) + '</td><td class="numeric">' + q + '</td><td class="numeric">' + to2(p) + '</td><td class="numeric">' + to2(s) + '</td>';
         tbody.appendChild(tr);
       });
 
@@ -311,7 +328,6 @@
       document.getElementById('rTotal').textContent = to2(total);
     }
 
-    // helper: wait for images
     function waitForImages(container) {
       const imgs = Array.from(container.querySelectorAll('img'));
       return Promise.all(imgs.map(img => {
@@ -320,7 +336,6 @@
       }));
     }
 
-    // Toggle-safe fallback print (show only receipt)
     function printReceiptFallback() {
       try {
         document.documentElement.classList.add('print-only-receipt');
@@ -334,14 +349,25 @@
       }
     }
 
-    // Robust PDF generation using iframe to ensure styles inherited
     async function generatePdfRobust() {
+      // ensure html2pdf is available (local file or loaded via loader)
+      if (typeof html2pdf === 'undefined') {
+        console.warn('html2pdf not loaded yet. Will try a short wait.');
+        // wait briefly for loader to inject
+        await new Promise(r => setTimeout(r, 800));
+      }
+      if (typeof html2pdf === 'undefined') {
+        console.warn('html2pdf still undefined — using print fallback');
+        printReceiptFallback();
+        return;
+      }
+
       try {
         updatePreview();
         const receipt = document.getElementById('receipt');
         try { await waitForImages(receipt); } catch(e){ console.warn('Image wait issue:', e); }
 
-        // create invisible iframe and write receipt + styles into it
+        // create iframe to preserve computed styles
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.left = '0';
@@ -356,18 +382,13 @@
         const iDoc = iframe.contentDocument || iframe.contentWindow.document;
         iDoc.open();
 
-        // collect accessible CSS rules; otherwise link stylesheet hrefs
         let cssText = '';
         for (let i = 0; i < document.styleSheets.length; i++) {
           const ss = document.styleSheets[i];
           try {
             if (ss.cssRules) {
-              for (let j = 0; j < ss.cssRules.length; j++) {
-                cssText += ss.cssRules[j].cssText + '\n';
-              }
-            } else if (ss.href) {
-              iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
-            }
+              for (let j = 0; j < ss.cssRules.length; j++) cssText += ss.cssRules[j].cssText + '\n';
+            } else if (ss.href) iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
           } catch (err) {
             if (ss.href) iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
           }
@@ -377,14 +398,12 @@
         const widthStyle = (paper === 'a4') ? '210mm' : '148mm';
 
         const html = '<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>'
-          + cssText
-          + 'body{background:#fff;margin:0;} #receipt{width:' + widthStyle + ';box-sizing:border-box;padding:12mm;}'
-          + '</style></head><body>' + receipt.outerHTML + '</body></html>';
+          + cssText + 'body{background:#fff;margin:0;} #receipt{width:' + widthStyle + ';box-sizing:border-box;padding:12mm;}'
+          + '</style></head><body>' + document.getElementById('receipt').outerHTML + '</body></html>';
 
         iDoc.write(html);
         iDoc.close();
 
-        // wait images inside iframe
         const iframeReceipt = iDoc.getElementById('receipt');
         if (!iframeReceipt) throw new Error('Iframe receipt not found');
 
@@ -400,7 +419,6 @@
           setTimeout(resolve, 3000);
         });
 
-        // prepare html2pdf options
         const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
         const opts = {
           margin: [8,8,8,8],
@@ -410,18 +428,14 @@
           jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
         };
 
-        // run html2pdf on iframe document body (reduces style isolation issues)
         await html2pdf().set(opts).from(iDoc.body).save();
 
-        // cleanup iframe
         document.body.removeChild(iframe);
         return;
       } catch (err) {
         console.error('generatePdfRobust failed:', err);
-        // cleanup any iframe left
         const maybe = document.querySelector('body > iframe[style*="pointer-events: none"]');
         if (maybe) try { maybe.remove(); } catch(e){}
-        // fallback print safe
         printReceiptFallback();
       }
     }
@@ -438,7 +452,6 @@
       document.getElementById('printBtn').addEventListener('click', generatePdfRobust);
     }
 
-    // init
     seedRows();
     bindUI();
     updatePreview();
