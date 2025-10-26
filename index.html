@@ -350,96 +350,134 @@
       }
     }
 
-    async function generatePdfRobust() {
-      // ensure html2pdf is available (local file or loaded via loader)
-      if (typeof html2pdf === 'undefined') {
-        console.warn('html2pdf not loaded yet. Will try a short wait.');
-        // wait briefly for loader to inject
-        await new Promise(r => setTimeout(r, 800));
-      }
-      if (typeof html2pdf === 'undefined') {
-        console.warn('html2pdf still undefined — using print fallback');
-        printReceiptFallback();
-        return;
-      }
+    // Gantikan fungsi generatePdfRobust() sedia ada dengan fungsi ini
+async function generatePdfRobust() {
+  // Jika html2pdf tidak ada, fallback ke print
+  if (typeof html2pdf === 'undefined') {
+    console.warn('html2pdf not available — using print fallback');
+    printReceiptFallback();
+    return;
+  }
 
-      try {
-        updatePreview();
-        const receipt = document.getElementById('receipt');
-        try { await waitForImages(receipt); } catch(e){ console.warn('Image wait issue:', e); }
+  try {
+    updatePreview(); // pastikan preview terkini
+    const receipt = document.getElementById('receipt');
 
-        // create iframe to preserve computed styles
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '0';
-        iframe.style.top = '0';
-        iframe.style.width = '100vw';
-        iframe.style.height = '100vh';
-        iframe.style.opacity = '0';
-        iframe.style.pointerEvents = 'none';
-        iframe.style.zIndex = '999999';
-        document.body.appendChild(iframe);
+    // tunggu imej pada preview asal
+    try { await waitForImages(receipt); } catch(e){ console.warn('waitForImages warning:', e); }
 
-        const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-        iDoc.open();
+    // clone receipt
+    const clone = receipt.cloneNode(true);
 
-        let cssText = '';
-        for (let i = 0; i < document.styleSheets.length; i++) {
-          const ss = document.styleSheets[i];
-          try {
-            if (ss.cssRules) {
-              for (let j = 0; j < ss.cssRules.length; j++) cssText += ss.cssRules[j].cssText + '\n';
-            } else if (ss.href) iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
-          } catch (err) {
-            if (ss.href) iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
-          }
-        }
+    // convert form controls dalam clone ke teks (input, textarea, select)
+    Array.from(clone.querySelectorAll('input, textarea, select')).forEach(el => {
+      const val = (el.value !== undefined) ? el.value : el.textContent;
+      const span = document.createElement('div');
+      span.textContent = val;
+      // copy some basic inline style to preserve look (optional)
+      span.style.fontSize = window.getComputedStyle(el).fontSize;
+      span.style.fontFamily = window.getComputedStyle(el).fontFamily;
+      el.parentNode.replaceChild(span, el);
+    });
 
-        const paper = (document.getElementById('paperSize') || {}).value || 'a4';
-        const widthStyle = (paper === 'a4') ? '210mm' : '148mm';
+    // function to try convert img to dataURL if same-origin; otherwise remove img
+    async function sanitizeImages(node) {
+      const imgs = Array.from(node.querySelectorAll('img'));
+      for (const img of imgs) {
+        try {
+          // if image has no src, remove
+          if (!img.src) { img.remove(); continue; }
 
-        const html = '<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>'
-          + cssText + 'body{background:#fff;margin:0;} #receipt{width:' + widthStyle + ';box-sizing:border-box;padding:12mm;}'
-          + '</style></head><body>' + document.getElementById('receipt').outerHTML + '</body></html>';
-
-        iDoc.write(html);
-        iDoc.close();
-
-        const iframeReceipt = iDoc.getElementById('receipt');
-        if (!iframeReceipt) throw new Error('Iframe receipt not found');
-
-        await new Promise((resolve) => {
-          const imgs = Array.from(iDoc.getElementsByTagName('img'));
-          if (!imgs.length) return resolve();
-          let loaded = 0;
-          const check = () => { if (++loaded >= imgs.length) resolve(); };
-          imgs.forEach(img => {
-            if (img.complete) check();
-            else { img.addEventListener('load', check); img.addEventListener('error', check); }
+          // try to draw to canvas to get dataURL
+          await new Promise((res, rej) => {
+            // create new image to avoid tainting original
+            const test = new Image();
+            test.crossOrigin = 'anonymous';
+            test.onload = () => {
+              try {
+                const c = document.createElement('canvas');
+                c.width = test.naturalWidth || test.width;
+                c.height = test.naturalHeight || test.height;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(test, 0, 0);
+                const data = c.toDataURL('image/png');
+                img.src = data; // replace src in clone
+                res();
+              } catch (err) {
+                // tainted or other error -> remove image to avoid blank PDF
+                console.warn('Image cannot be inlined (CORS/taint) — removing:', img.src, err);
+                img.remove();
+                res();
+              }
+            };
+            test.onerror = () => {
+              // cannot load image (maybe blocked) -> remove
+              console.warn('Image failed to load in sanitizer — removing:', img.src);
+              img.remove();
+              res();
+            };
+            // start load
+            test.src = img.src;
+            // safety timeout
+            setTimeout(res, 2500);
           });
-          setTimeout(resolve, 3000);
-        });
-
-        const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
-        const opts = {
-          margin: [8,8,8,8],
-          filename: filenameBase + '.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, allowTaint: false, windowWidth: iframeReceipt.scrollWidth, windowHeight: iframeReceipt.scrollHeight },
-          jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
-        };
-
-        await html2pdf().set(opts).from(iDoc.body).save();
-
-        document.body.removeChild(iframe);
-        return;
-      } catch (err) {
-        console.error('generatePdfRobust failed:', err);
-        const maybe = document.querySelector('body > iframe[style*="pointer-events: none"]');
-        if (maybe) try { maybe.remove(); } catch(e){}
-        printReceiptFallback();
+        } catch (e) {
+          console.warn('sanitizeImages caught error for', img.src, e);
+          try { img.remove(); } catch(_) {}
+        }
       }
     }
+
+    // sanitize images in clone
+    await sanitizeImages(clone);
+
+    // ensure clone visible for computed style (offscreen but rendered)
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = '1px';
+    wrapper.style.height = '1px';
+    wrapper.style.overflow = 'hidden';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
+    // force reflow so styles computed
+    clone.getBoundingClientRect();
+
+    // set width according to selected paper
+    const paper = (document.getElementById('paperSize') || {}).value || 'a4';
+    clone.style.boxSizing = 'border-box';
+    clone.style.padding = '12mm';
+    clone.style.background = '#fff';
+    clone.style.width = (paper === 'a4') ? '210mm' : '148mm';
+
+    // prepare html2pdf options (render only the clone)
+    const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
+    const opts = {
+      margin: [8,8,8,8],
+      filename: filenameBase + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: false, logging: false },
+      jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
+    };
+
+    // generate PDF
+    await html2pdf().set(opts).from(clone).save();
+
+    // cleanup
+    document.body.removeChild(wrapper);
+    return;
+  } catch (err) {
+    console.error('generatePdfRobust (final) failed:', err);
+    // cleanup wrapper if exists
+    const maybe = document.querySelector('body > div[style*="left: -9999px"]');
+    if (maybe) try { maybe.remove(); } catch(e){}
+    // fallback to printing receipt only
+    printReceiptFallback();
+  }
+}
+
 
     // bind UI
     function bindUI() {
