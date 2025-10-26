@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Receipt Generator — BelantikMaya (A4/A5)</title>
+  <title>Receipt Generator — BelantikMaya (A4/A5) — Robust PDF</title>
   <style>
     :root{
       --brand-dark:#1f4d45;
@@ -24,7 +24,6 @@
     button.secondary{background:#666}
     .actions{display:flex;gap:8px;margin-top:12px}
     .preview-viewport{width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start}
-    /* preview paper styling */
     .receipt{width:100%;max-width:720px;background:#fff;padding:16px;box-sizing:border-box;position:relative;border:1px solid #eee}
     .header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
     .company{display:flex;gap:12px;align-items:center}
@@ -48,7 +47,6 @@
     .totals .discount{font-weight:600}
     .totals .grand{font-weight:900;font-size:16px}
     .foot{margin-top:12px;font-size:12px;color:#555}
-
     @media(max-width:900px){
       .app{flex-direction:column}
       .header{flex-direction:column;align-items:flex-start}
@@ -57,7 +55,6 @@
       .inv{text-align:left}
       .receipt{max-width:100%;padding:12px}
     }
-    /* Note: We don't use @media print here because we generate PDF via html2pdf */
   </style>
 </head>
 <body>
@@ -154,7 +151,7 @@
 
     <div class="col" id="previewCol">
       <div class="preview-viewport">
-        <div id="receipt" class="receipt" role="document" aria-label="Preview Resit">
+        <div id="receipt" class="receipt" role="document">
           <div class="header">
             <div class="company">
               <img src="logo.webp" class="logo" id="logoImg" alt="logo" onerror="this.style.display='none'" />
@@ -200,7 +197,7 @@
     </div>
   </div>
 
-  <!-- html2pdf bundle (reliable client-side PDF generator) -->
+  <!-- html2pdf bundle -->
   <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
 
   <script>
@@ -274,7 +271,7 @@
       document.getElementById('rCustEmail').textContent = ce ? ('Email: ' + ce) : '';
       document.getElementById('rCustPhone').textContent = cp ? ('Tel: ' + cp) : '';
 
-      // build items in preview
+      // build items
       const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML = '';
       let subtotal = 0;
       document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
@@ -301,7 +298,7 @@
       document.getElementById('rTotal').textContent = to2(total);
     }
 
-    // wait for images to load (logo) before PDF generation
+    // helper: wait for images
     function waitForImages(container) {
       const imgs = Array.from(container.querySelectorAll('img'));
       return Promise.all(imgs.map(img => {
@@ -310,43 +307,71 @@
       }));
     }
 
-    // generate PDF using html2pdf, ensuring a single page and chosen paper size
-    async function generatePdf() {
-      updatePreview(); // ensure latest
+    // attempt PDF generation with retries & fallbacks
+    async function generatePdfRobust() {
+      updatePreview();
       const receipt = document.getElementById('receipt');
       await waitForImages(receipt);
 
-      // clone the receipt and set explicit paper size in mm
+      // clone element
       const clone = receipt.cloneNode(true);
+
+      // pick paper
       const paper = (document.getElementById('paperSize') || {}).value || 'a4';
-      // set width in mm so html2pdf scales correctly
+      clone.style.background = '#fff';
+
+      // try strategies in order
+      const attempts = [
+        {scale: 2, useCORS: true, desc: 'High quality (scale=2)'},
+        {scale: 1.5, useCORS: true, desc: 'Medium quality (scale=1.5)'},
+        {scale: 1, useCORS: true, desc: 'Low quality (scale=1)'},
+        {scale: 1, useCORS: false, desc: 'Low quality, no CORS (scale=1)'}
+      ];
+
+      // We'll set width according to paper so html2pdf scales correctly
       if (paper === 'a4') clone.style.width = '210mm';
-      else clone.style.width = '148mm'; // a5
+      else clone.style.width = '148mm';
 
-      // create off-screen wrapper to preserve computed styles
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'fixed';
-      wrapper.style.left = '-9999px';
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
+      // wrapper
+      const wrapper = document.createElement('div'); wrapper.style.position='fixed'; wrapper.style.left='-9999px'; wrapper.appendChild(clone); document.body.appendChild(wrapper);
 
-      const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
-      const opt = {
-        margin: [8,8,8,8],
-        filename: `${filenameBase}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: false },
-        jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
-      };
+      let lastErr = null;
+      for (let i = 0; i < attempts.length; i++) {
+        const a = attempts[i];
+        try {
+          // ensure cloned imgs have crossorigin set when requested
+          if (a.useCORS) {
+            Array.from(clone.querySelectorAll('img')).forEach(img => { try { img.setAttribute('crossorigin','anonymous'); } catch(e){} });
+          } else {
+            Array.from(clone.querySelectorAll('img')).forEach(img => { try { img.removeAttribute('crossorigin'); } catch(e){} });
+          }
 
-      try {
-        await html2pdf().set(opt).from(clone).save();
-      } catch (err) {
-        console.error('PDF generation failed', err);
-        alert('Gagal hasilkan PDF. Sila cuba gunakan Print dialog sebagai fallback.');
-      } finally {
-        document.body.removeChild(wrapper);
+          const opts = {
+            margin: [8,8,8,8],
+            filename: ((document.getElementById('invNo')||{}).value || 'resit') + '.pdf',
+            image: { type: 'jpeg', quality: 0.97 },
+            html2canvas: { scale: a.scale, useCORS: a.useCORS, allowTaint: !a.useCORS },
+            jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
+          };
+
+          console.info('Percubaan PDF:', a.desc);
+          await html2pdf().set(opts).from(clone).save();
+          // success -> cleanup and return
+          document.body.removeChild(wrapper);
+          return;
+        } catch (err) {
+          console.error('Percubaan PDF gagal:', attempts[i], err);
+          lastErr = err;
+          // continue to next attempt
+        }
       }
+
+      // all attempts failed -> cleanup & fallback
+      document.body.removeChild(wrapper);
+      console.error('Semua percubaan PDF gagal. Ralat terakhir:', lastErr);
+      alert('Gagal hasilkan PDF secara automatik. Buka Print dialog sebagai fallback (OK untuk teruskan). Ralat: ' + (lastErr && lastErr.message ? lastErr.message : 'unknown'));
+      // fallback to window.print
+      setTimeout(()=>{ window.print(); }, 250);
     }
 
     // bind UI
@@ -358,7 +383,7 @@
       document.getElementById('updatePreview').addEventListener('click', updatePreview);
       document.getElementById('addRow').addEventListener('click', ()=>{ addItemRow('Perkara',1,0); updatePreview(); });
       document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); seedRows(); });
-      document.getElementById('printBtn').addEventListener('click', generatePdf);
+      document.getElementById('printBtn').addEventListener('click', generatePdfRobust);
     }
 
     // init
