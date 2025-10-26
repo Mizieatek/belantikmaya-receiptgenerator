@@ -56,7 +56,7 @@
       @page { size: A4; margin: 0; }
     }
 
-    /* utility: when class toggled (for safety) */
+    /* utility: class toggle for print-only fallback */
     .print-only-receipt * { display: none !important; }
     .print-only-receipt #receipt, .print-only-receipt #receipt * { display: block !important; visibility: visible !important; }
 
@@ -324,10 +324,8 @@
     function printReceiptFallback() {
       try {
         document.documentElement.classList.add('print-only-receipt');
-        // small delay to allow repaint
         setTimeout(function () {
           window.print();
-          // remove class after short delay
           setTimeout(function () { document.documentElement.classList.remove('print-only-receipt'); }, 800);
         }, 120);
       } catch (e) {
@@ -336,66 +334,96 @@
       }
     }
 
-    // attempt PDF generation with retries & fallback to printReceiptFallback()
+    // Robust PDF generation using iframe to ensure styles inherited
     async function generatePdfRobust() {
-      updatePreview();
-      const receipt = document.getElementById('receipt');
       try {
-        await waitForImages(receipt);
-      } catch (e) {
-        console.warn('Image load issue (continuing):', e);
-      }
+        updatePreview();
+        const receipt = document.getElementById('receipt');
+        try { await waitForImages(receipt); } catch(e){ console.warn('Image wait issue:', e); }
 
-      const clone = receipt.cloneNode(true);
-      const paper = (document.getElementById('paperSize') || {}).value || 'a4';
-      clone.style.background = '#fff';
-      clone.style.boxSizing = 'border-box';
-      clone.style.padding = '12mm';
-      if (paper === 'a4') clone.style.width = '210mm'; else clone.style.width = '148mm';
+        // create invisible iframe and write receipt + styles into it
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '0';
+        iframe.style.top = '0';
+        iframe.style.width = '100vw';
+        iframe.style.height = '100vh';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.zIndex = '999999';
+        document.body.appendChild(iframe);
 
-      const wrapper = document.createElement('div'); wrapper.style.position = 'fixed'; wrapper.style.left = '-9999px'; wrapper.appendChild(clone); document.body.appendChild(wrapper);
+        const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+        iDoc.open();
 
-      const attempts = [
-        { scale: 2, useCORS: true, desc: 'High quality (scale=2)' },
-        { scale: 1.5, useCORS: true, desc: 'Medium quality (scale=1.5)' },
-        { scale: 1, useCORS: true, desc: 'Low quality (scale=1)' },
-        { scale: 1, useCORS: false, desc: 'Low quality, no CORS' }
-      ];
-
-      let lastErr = null;
-      for (let i = 0; i < attempts.length; i++) {
-        const a = attempts[i];
-        try {
-          // set crossorigin attr for cloned images when requested
-          if (a.useCORS) {
-            Array.from(clone.querySelectorAll('img')).forEach(img => { try { img.setAttribute('crossorigin', 'anonymous'); } catch (e) { } });
-          } else {
-            Array.from(clone.querySelectorAll('img')).forEach(img => { try { img.removeAttribute('crossorigin'); } catch (e) { } });
+        // collect accessible CSS rules; otherwise link stylesheet hrefs
+        let cssText = '';
+        for (let i = 0; i < document.styleSheets.length; i++) {
+          const ss = document.styleSheets[i];
+          try {
+            if (ss.cssRules) {
+              for (let j = 0; j < ss.cssRules.length; j++) {
+                cssText += ss.cssRules[j].cssText + '\n';
+              }
+            } else if (ss.href) {
+              iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
+            }
+          } catch (err) {
+            if (ss.href) iDoc.write('<link rel="stylesheet" href="' + ss.href + '">');
           }
-
-          const opts = {
-            margin: [8, 8, 8, 8],
-            filename: ((document.getElementById('invNo') || {}).value || 'resit') + '.pdf',
-            image: { type: 'jpeg', quality: 0.97 },
-            html2canvas: { scale: a.scale, useCORS: a.useCORS, allowTaint: !a.useCORS },
-            jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
-          };
-
-          console.info('Percubaan PDF:', a.desc);
-          await html2pdf().set(opts).from(clone).save();
-          document.body.removeChild(wrapper);
-          return;
-        } catch (err) {
-          console.error('Percubaan PDF gagal:', a, err);
-          lastErr = err;
         }
-      }
 
-      // semua percubaan gagal
-      document.body.removeChild(wrapper);
-      console.error('Semua percubaan PDF gagal. Ralat terakhir:', lastErr);
-      // fallback -> print only receipt
-      printReceiptFallback();
+        const paper = (document.getElementById('paperSize') || {}).value || 'a4';
+        const widthStyle = (paper === 'a4') ? '210mm' : '148mm';
+
+        const html = '<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>'
+          + cssText
+          + 'body{background:#fff;margin:0;} #receipt{width:' + widthStyle + ';box-sizing:border-box;padding:12mm;}'
+          + '</style></head><body>' + receipt.outerHTML + '</body></html>';
+
+        iDoc.write(html);
+        iDoc.close();
+
+        // wait images inside iframe
+        const iframeReceipt = iDoc.getElementById('receipt');
+        if (!iframeReceipt) throw new Error('Iframe receipt not found');
+
+        await new Promise((resolve) => {
+          const imgs = Array.from(iDoc.getElementsByTagName('img'));
+          if (!imgs.length) return resolve();
+          let loaded = 0;
+          const check = () => { if (++loaded >= imgs.length) resolve(); };
+          imgs.forEach(img => {
+            if (img.complete) check();
+            else { img.addEventListener('load', check); img.addEventListener('error', check); }
+          });
+          setTimeout(resolve, 3000);
+        });
+
+        // prepare html2pdf options
+        const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
+        const opts = {
+          margin: [8,8,8,8],
+          filename: filenameBase + '.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: false, windowWidth: iframeReceipt.scrollWidth, windowHeight: iframeReceipt.scrollHeight },
+          jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
+        };
+
+        // run html2pdf on iframe document body (reduces style isolation issues)
+        await html2pdf().set(opts).from(iDoc.body).save();
+
+        // cleanup iframe
+        document.body.removeChild(iframe);
+        return;
+      } catch (err) {
+        console.error('generatePdfRobust failed:', err);
+        // cleanup any iframe left
+        const maybe = document.querySelector('body > iframe[style*="pointer-events: none"]');
+        if (maybe) try { maybe.remove(); } catch(e){}
+        // fallback print safe
+        printReceiptFallback();
+      }
     }
 
     // bind UI
