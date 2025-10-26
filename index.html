@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Receipt Generator — BelantikMaya (A5)</title>
+  <style>
+    :root{
+      --brand-dark:#1f4d45;
+      --accent:#ff8c42;
+      --muted:#f5f5f5;
+      --text:#111;
+      --paper-w:148mm;
+      --paper-h:210mm;
+      --preview-fixed-w:360px;
+    }
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;color:var(--text);background:#faf9f6}
+    .app{display:flex;gap:12px;padding:12px;box-sizing:border-box;height:100%;align-items:flex-start}
+    .panel{flex:1 1 auto;min-width:300px;background:#fff;padding:14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06);overflow:auto}
+    .panel h2{margin:0 0 12px;color:var(--brand-dark)}
+    label{display:block;font-size:13px;margin-top:12px;color:#333}
+    input[type=text], input[type=number], textarea, select, input[type=date]{width:100%;padding:8px 10px;border:1px solid #e6e6e6;border-radius:6px;margin-top:6px;box-sizing:border-box}
+    .row{display:flex;gap:10px}
+    .row .col{flex:1}
+    .actions{display:flex;gap:8px;margin-top:14px}
+    button{background:var(--brand-dark);color:#fff;border:none;padding:10px 12px;border-radius:6px;cursor:pointer}
+    button.secondary{background:#666}
+    .preview-wrap{flex:0 0 var(--preview-fixed-w);display:flex;align-items:flex-start;justify-content:center}
+    .preview-viewport{width:100%;border:1px solid #e9e9e9;padding:8px;background:#fff;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,.04);overflow:auto}
+    .preview-viewport .receipt{width:100%;max-width:var(--preview-fixed-w);height:auto;padding:10px;box-sizing:border-box;background:#fff;position:relative}
+    .receipt.print-size{width:var(--paper-w);height:var(--paper-h);padding:12mm}
+    .receipt .header{display:flex;gap:12px;align-items:center}
+    .logo{width:56px;height:56px;object-fit:contain}
+    .biz{font-weight:700;color:var(--brand-dark);font-size:18px}
+    .muted{color:#666;font-size:12px}
+    .items{margin-top:10px;border-collapse:collapse;width:100%}
+    .items th,.items td{border-bottom:1px dashed #ddd;padding:6px;font-size:12px;text-align:left}
+    .items th{font-size:12px;color:#444}
+    .total-row td{font-weight:700}
+    .foot{position:relative;margin-top:12px;font-size:11px;color:#555}
+    @media print{
+      body{background:#fff}
+      .app>*{display:none}
+      .receipt{box-shadow:none;margin:0}
+      @page{size:148mm 210mm;margin:0}
+    }
+    @media(max-width:900px){
+      .app{flex-direction:column}
+      .panel{order:1}
+      .preview-wrap{order:2;flex-basis:auto;margin-top:6px;flex:1 1 auto}
+      .preview-viewport{width:100%;max-width:100%}
+      .preview-viewport .receipt{max-width:100%;padding:8px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <h2>Receipt Generator — BelantikMaya</h2>
+
+      <label>Nama Perniagaan</label>
+      <input id="bizName" type="text" value="BelantikMaya" />
+
+      <label>Website</label>
+      <input id="bizWebsite" type="text" value="https://belantikmaya.netlify.app" />
+
+      <label>Email Perniagaan</label>
+      <input id="bizEmail" type="text" value="info@belantikmaya.my" />
+
+      <label>Alamat</label>
+      <textarea id="bizAddr" rows="2">Petaling Jaya, Selangor</textarea>
+
+      <div class="row">
+        <div class="col">
+          <label>No. Telefon</label>
+          <input id="bizPhone" type="text" value="012-3456789" />
+        </div>
+        <div class="col">
+          <label>No. Resit / Invois (Opsyenal, Override)</label>
+          <input id="invNo" type="text" placeholder="Biarkan kosong untuk auto" />
+        </div>
+      </div>
+
+      <hr style="margin:14px 0;border:none;border-top:1px solid #eee" />
+
+      <div class="row">
+        <div class="col">
+          <label>Nama Pelanggan</label>
+          <input id="custName" type="text" value="" />
+        </div>
+        <div class="col">
+          <label>Email Pelanggan (opsyenal)</label>
+          <input id="custEmail" type="text" value="" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Telefon Pelanggan (opsyenal)</label>
+          <input id="custPhone" type="text" value="" />
+        </div>
+        <div class="col">
+          <label>Tarikh Resit (boleh pilih/backdate)</label>
+          <input id="date" type="date" value="2025-10-27" />
+        </div>
+      </div>
+
+      <label>Kaedah Bayaran</label>
+      <select id="payMethod"><option>Tunai</option><option>Bank Transfer</option><option>Online</option></select>
+
+      <hr style="margin:14px 0;border:none;border-top:1px solid #eee" />
+
+      <h3 style="margin:0 0 8px">Item</h3>
+      <table id="itemsTable" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left">Deskripsi</th>
+            <th style="width:80px">Qty</th>
+            <th style="width:110px">Harga (RM)</th>
+            <th style="width:110px">Jumlah (RM)</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button type="button" id="addRow">Tambah Baris</button>
+        <button type="button" class="secondary" id="resetRows">Reset</button>
+      </div>
+
+      <div class="actions">
+        <button id="updatePreview">Kemas kini Preview</button>
+        <button id="printBtn" style="background:var(--accent)">Cetak / PDF</button>
+      </div>
+
+      <p style="margin-top:12px;font-size:13px;color:#666">Nota: Letakkan fail logo bernama <code>logo.webp</code> dalam folder yang sama dengan fail HTML ini untuk dipaparkan pada resit. Paparan preview di kanan dioptimumkan untuk desktop dan mobile — pada skrin kecil ia akan berada di bawah borang.</p>
+    </div>
+
+    <div class="preview-wrap">
+      <div class="preview-viewport">
+        <div id="receipt" class="receipt" role="document">
+          <div class="header">
+            <img src="logo.webp" alt="logo" class="logo" id="logoImg" onerror="this.style.display='none'" />
+            <div>
+              <div class="biz" id="rBizName">BelantikMaya</div>
+              <div class="muted" id="rBizAddr">Petaling Jaya, Selangor</div>
+              <div class="muted" id="rBizPhone">012-3456789</div>
+              <div class="muted" id="rBizWebsite">https://belantikmaya.netlify.app</div>
+              <div class="muted" id="rBizEmail">info@belantikmaya.my</div>
+            </div>
+          </div>
+
+          <!-- Customer block -->
+          <div style="margin-top:10px;border-top:1px solid #f0f0f0;padding-top:8px">
+            <div style="font-size:13px;font-weight:700">BIL KEPADA / CUSTOMER</div>
+            <div style="font-size:12px;color:#444" id="rCustName">-</div>
+            <div style="font-size:12px;color:#444" id="rCustEmail"></div>
+            <div style="font-size:12px;color:#444" id="rCustPhone"></div>
+          </div>
+
+          <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:12px;color:#444">No: <span id="rInv">INV-2025-001</span></div>
+              <div style="font-size:12px;color:#444">Tarikh: <span id="rDate">2025-10-27</span></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:#444">Kaedah: <span id="rPay">Tunai</span></div>
+            </div>
+          </div>
+
+          <table class="items" id="rItems">
+            <thead>
+              <tr><th>Perkara</th><th style="text-align:right">Qty</th><th style="text-align:right">Harga</th><th style="text-align:right">Jumlah</th></tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+              <tr class="total-row"><td colspan="2"></td><td style="text-align:right">Subtotal</td><td style="text-align:right" id="rSubtotal">0.00</td></tr>
+              <tr><td colspan="2"></td><td style="text-align:right">Diskaun</td><td style="text-align:right" id="rDiscount">0.00</td></tr>
+              <tr class="total-row"><td colspan="2"></td><td style="text-align:right">Jumlah</td><td style="text-align:right" id="rTotal">0.00</td></tr>
+            </tfoot>
+          </table>
+
+          <div class="foot">Terima kasih kerana memilih BelantikMaya. Semua jualan adalah tertakluk kepada terma & syarat.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const to2 = v=>Number(v||0).toFixed(2);
+    function escapeHtml(unsafe){return (unsafe||'').toString().replace(/[&<>\"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":\"&#39;\"}[m];});}
+
+    // add item row function
+    const itemsBody = document.querySelector('#itemsTable tbody');
+    function addItemRow(desc='',qty=1,price=0){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="itm-desc" type="text" value="${desc}"/></td>
+        <td><input class="itm-qty" type="number" min="1" value="${qty}"/></td>
+        <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}"/></td>
+        <td class="itm-sum">${to2(qty*price)}</td>
+        <td><button class="del">-</button></td>
+      `;
+      itemsBody.appendChild(tr);
+
+      // attach listeners
+      tr.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',updateRow));
+      tr.querySelector('.del').addEventListener('click',()=>{tr.remove();updateRow();});
+      updateRow();
+    }
+
+    document.getElementById('addRow').addEventListener('click',()=>addItemRow('Perkara',1,0));
+    document.getElementById('resetRows').addEventListener('click',()=>{itemsBody.innerHTML='';updateRow();});
+
+    function updateRow(){
+      document.querySelectorAll('#itemsTable tbody tr').forEach(r=>{
+        const q = Number(r.querySelector('.itm-qty').value||0);
+        const p = Number(r.querySelector('.itm-price').value||0);
+        r.querySelector('.itm-sum').textContent = to2(q*p);
+      });
+      updatePreview();
+    }
+
+    // update preview
+    function updatePreview(){
+      // business info
+      document.getElementById('rBizName').textContent = document.getElementById('bizName').value || 'BelantikMaya';
+      document.getElementById('rBizAddr').textContent = document.getElementById('bizAddr').value || '';
+      document.getElementById('rBizPhone').textContent = document.getElementById('bizPhone').value || '';
+      document.getElementById('rBizWebsite').textContent = document.getElementById('bizWebsite').value || '';
+      document.getElementById('rBizEmail').textContent = document.getElementById('bizEmail').value || '';
+
+      // invoice number
+      const invField = document.getElementById('invNo').value.trim();
+      const invNo = invField || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
+      document.getElementById('rInv').textContent = invNo;
+
+      // date
+      const dateVal = document.getElementById('date').value;
+      document.getElementById('rDate').textContent = dateVal || new Date().toISOString().slice(0,10);
+
+      document.getElementById('rPay').textContent = document.getElementById('payMethod').value;
+
+      // customer info
+      const custName = document.getElementById('custName').value.trim();
+      const custEmail = document.getElementById('custEmail').value.trim();
+      const custPhone = document.getElementById('custPhone').value.trim();
+      document.getElementById('rCustName').textContent = custName || '-';
+      document.getElementById('rCustEmail').textContent = custEmail ? ('Email: ' + custEmail) : '';
+      document.getElementById('rCustPhone').textContent = custPhone ? ('Tel: ' + custPhone) : '';
+
+      // items and totals
+      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML='';
+      let subtotal=0;
+      document.querySelectorAll('#itemsTable tbody tr').forEach(r=>{
+        const d = r.querySelector('.itm-desc').value || '';
+        const q = Number(r.querySelector('.itm-qty').value||0);
+        const p = Number(r.querySelector('.itm-price').value||0);
+        const s = q*p; subtotal+=s;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="font-size:12px">${escapeHtml(d)}</td><td style="text-align:right">${q}</td><td style="text-align:right">${to2(p)}</td><td style="text-align:right">${to2(s)}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('rSubtotal').textContent = to2(subtotal);
+      document.getElementById('rDiscount').textContent = '0.00';
+      document.getElementById('rTotal').textContent = to2(subtotal);
+    }
+
+    // print handler
+    document.getElementById('printBtn').addEventListener('click',()=>{
+      // open new window with real A5
+      const w = window.open('', '_blank');
+      const doc = w.document;
+      const content = document.getElementById('receipt').outerHTML;
+      doc.open();
+      doc.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Resit</title><style>@page{size:148mm 210mm;margin:0}body{margin:0;padding:0;font-family:Arial} .receipt{width:148mm;height:210mm;padding:12mm;box-sizing:border-box} .logo{width:56px;height:56px;object-fit:contain} table{width:100%;border-collapse:collapse} td,th{padding:6px;border-bottom:1px dashed #ddd;font-size:12px}</style></head><body>${content}</body></html>`);
+      doc.close();
+      w.focus();
+      setTimeout(()=>{w.print();},500);
+    });
+
+    document.getElementById('updatePreview').addEventListener('click',updatePreview);
+
+    // seed rows
+    addItemRow('Magnetic Insect Screen',1,50);
+    addItemRow('Installation',1,30);
+    updatePreview();
+
+    // ensure preview updates live when business/customer fields change
+    ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.addEventListener('input', updatePreview);
+    });
+  </script>
+</body>
+</html>
