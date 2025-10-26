@@ -3,15 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Receipt Generator — BelantikMaya (A5)</title>
+  <title>Receipt Generator — BelantikMaya (A4/A5)</title>
   <style>
     :root{
       --brand-dark:#1f4d45;
       --accent:#ff8c42;
       --muted:#f5f5f5;
       --text:#111;
-      --paper-w:148mm;
-      --paper-h:210mm;
       --logo-size:88px;
       --gap:12px;
     }
@@ -26,14 +24,14 @@
     button.secondary{background:#666}
     .actions{display:flex;gap:8px;margin-top:12px}
     .preview-viewport{width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start}
-    .receipt{width:100%;max-width:520px;background:#fff;padding:16px;box-sizing:border-box;position:relative;border:1px solid #eee}
-    .receipt.print-size{width:var(--paper-w);height:var(--paper-h);padding:12mm}
+    /* preview paper styling */
+    .receipt{width:100%;max-width:720px;background:#fff;padding:16px;box-sizing:border-box;position:relative;border:1px solid #eee}
     .header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
     .company{display:flex;gap:12px;align-items:center}
     .logo{width:var(--logo-size);height:var(--logo-size);object-fit:contain}
     .company-info{font-size:13px}
     .company-info .biz{font-weight:700;color:var(--brand-dark);font-size:16px}
-    .meta{font-size:13px;text-align:right}
+    .meta{font-size:13px;text-align:right;min-width:160px}
     .meta div{color:#444}
     .cust-inv{display:flex;justify-content:space-between;gap:12px;margin-top:12px}
     .cust{flex:1}
@@ -44,22 +42,12 @@
     table.items th{text-align:left}
     table.items td.numeric{text-align:right}
     .totals{margin-top:8px;display:flex;justify-content:flex-end}
-    .totals table{width:320px;border-collapse:collapse}
+    .totals table{width:360px;border-collapse:collapse}
     .totals td{padding:6px;font-size:13px}
-    .totals .label{text-align:left}
-    .totals .val{text-align:right}
     .totals .subtotal{font-weight:600}
     .totals .discount{font-weight:600}
-    .totals .grand{font-weight:900;font-size:15px}
+    .totals .grand{font-weight:900;font-size:16px}
     .foot{margin-top:12px;font-size:12px;color:#555}
-
-    /* print: hide everything except receipt and force A5 size */
-    @media print{
-      body *{visibility:hidden}
-      #receipt, #receipt *{visibility:visible}
-      #receipt{position:fixed;left:0;top:0;width:148mm;height:210mm;margin:0;padding:12mm;box-sizing:border-box}
-      @page { size: 148mm 210mm; margin:0; }
-    }
 
     @media(max-width:900px){
       .app{flex-direction:column}
@@ -69,6 +57,7 @@
       .inv{text-align:left}
       .receipt{max-width:100%;padding:12px}
     }
+    /* Note: We don't use @media print here because we generate PDF via html2pdf */
   </style>
 </head>
 <body>
@@ -153,6 +142,9 @@
         </div>
       </div>
 
+      <label>Pilihan Saiz Kertas</label>
+      <select id="paperSize"><option value="a4">A4 (210 × 297 mm)</option><option value="a5">A5 (148 × 210 mm)</option></select>
+
       <div class="actions">
         <button id="updatePreview">Kemas kini Preview</button>
         <button id="printBtn" style="background:var(--accent)">Cetak Resit</button>
@@ -162,7 +154,7 @@
 
     <div class="col" id="previewCol">
       <div class="preview-viewport">
-        <div id="receipt" class="receipt" role="document">
+        <div id="receipt" class="receipt" role="document" aria-label="Preview Resit">
           <div class="header">
             <div class="company">
               <img src="logo.webp" class="logo" id="logoImg" alt="logo" onerror="this.style.display='none'" />
@@ -175,7 +167,7 @@
               </div>
             </div>
 
-            <div class="meta">
+            <div class="meta" id="metaHeader">
               <div>No: <span id="rInv">INV-2025-001</span></div>
               <div>Tarikh: <span id="rDate">27 Okt 2025</span></div>
               <div>Kaedah: <span id="rPay">Tunai</span></div>
@@ -208,155 +200,172 @@
     </div>
   </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  function to2(v) { return Number(v || 0).toFixed(2); }
-  function escapeHtml(s) { return (s || '').toString().replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+  <!-- html2pdf bundle (reliable client-side PDF generator) -->
+  <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
 
-  var itemsBody = document.querySelector('#itemsTable tbody');
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const to2 = v => Number(v || 0).toFixed(2);
+    const escapeHtml = s => String(s || '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    const itemsBody = document.querySelector('#itemsTable tbody');
 
-  function addItemRow(desc, qty, price) {
-    desc = desc || '';
-    qty = (typeof qty === 'number') ? qty : 1;
-    price = (typeof price === 'number') ? price : 0;
-    var tr = document.createElement('tr');
+    function addItemRow(desc = '', qty = 1, price = 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="itm-desc" type="text" value="${escapeHtml(desc)}" /></td>
+        <td><input class="itm-qty" type="number" min="1" value="${qty}" /></td>
+        <td><input class="itm-price" type="number" min="0" step="0.01" value="${price}" /></td>
+        <td class="itm-sum">${to2(qty * price)}</td>
+        <td><button type="button" class="del">-</button></td>
+      `;
+      itemsBody.appendChild(tr);
 
-    tr.innerHTML = ''
-      + '<td><input class="itm-desc" type="text" value="' + escapeHtml(desc) + '"></td>'
-      + '<td><input class="itm-qty" type="number" min="1" value="' + qty + '"></td>'
-      + '<td><input class="itm-price" type="number" min="0" step="0.01" value="' + price + '"></td>'
-      + '<td class="itm-sum">' + to2(qty * price) + '</td>'
-      + '<td><button type="button" class="del">-</button></td>';
+      const descEl = tr.querySelector('.itm-desc');
+      const qtyEl = tr.querySelector('.itm-qty');
+      const priceEl = tr.querySelector('.itm-price');
+      const delBtn = tr.querySelector('.del');
 
-    itemsBody.appendChild(tr);
+      function onRowChange() {
+        const q = Number(qtyEl.value || 0);
+        const p = Number(priceEl.value || 0);
+        tr.querySelector('.itm-sum').textContent = to2(q * p);
+        updatePreview();
+      }
 
-    var descEl = tr.querySelector('.itm-desc');
-    var qtyEl = tr.querySelector('.itm-qty');
-    var priceEl = tr.querySelector('.itm-price');
-    var delBtn = tr.querySelector('.del');
-
-    function onRowChange() {
-      var q = Number(qtyEl.value || 0);
-      var p = Number(priceEl.value || 0);
-      var sum = q * p;
-      var sumEl = tr.querySelector('.itm-sum');
-      if (sumEl) sumEl.textContent = to2(sum);
-      updatePreview();
+      descEl.addEventListener('input', updatePreview);
+      qtyEl.addEventListener('input', onRowChange);
+      priceEl.addEventListener('input', onRowChange);
+      delBtn.addEventListener('click', () => { tr.remove(); updatePreview(); });
     }
 
-    descEl.addEventListener('input', updatePreview);
-    qtyEl.addEventListener('input', onRowChange);
-    priceEl.addEventListener('input', onRowChange);
-    delBtn.addEventListener('click', function () { tr.parentNode.removeChild(tr); updatePreview(); });
-  }
-
-  function seedRows() {
-    if (document.querySelectorAll('#itemsTable tbody tr').length === 0) {
-      addItemRow('Magnetic Insect Screen', 1, 50);
-      addItemRow('Installation', 1, 30);
-    }
-  }
-
-  function formatDateToMalay(dstr) {
-    if (!dstr) return '';
-    var dt = new Date(dstr);
-    if (isNaN(dt.getTime())) return dstr;
-    return dt.toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' });
-  }
-
-  function updatePreview() {
-    var bizName = (document.getElementById('bizName') || {}).value || 'BelantikMaya';
-    var bizAddr = (document.getElementById('bizAddr') || {}).value || '';
-    var bizPhone = (document.getElementById('bizPhone') || {}).value || '';
-    var bizWebsite = (document.getElementById('bizWebsite') || {}).value || '';
-    var bizEmail = (document.getElementById('bizEmail') || {}).value || '';
-
-    document.getElementById('rBizName').textContent = bizName;
-    document.getElementById('rBizAddr').textContent = bizAddr;
-    document.getElementById('rBizPhone').textContent = bizPhone;
-    document.getElementById('rBizWebsite').textContent = bizWebsite;
-    document.getElementById('rBizEmail').textContent = bizEmail;
-
-    var invField = (document.getElementById('invNo') || {}).value || '';
-    var invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random() * 900 + 100)));
-    document.getElementById('rInv').textContent = invNo;
-
-    var dateVal = (document.getElementById('date') || {}).value || new Date().toISOString().slice(0,10);
-    document.getElementById('rDate').textContent = formatDateToMalay(dateVal);
-
-    var pay = (document.getElementById('payMethod') || {}).value || '';
-    document.getElementById('rPay').textContent = pay;
-
-    var cName = (document.getElementById('custName') || {}).value || '';
-    var cEmail = (document.getElementById('custEmail') || {}).value || '';
-    var cPhone = (document.getElementById('custPhone') || {}).value || '';
-    document.getElementById('rCustName').textContent = cName || '-';
-    document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
-    document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
-
-    // build items table in preview
-    var tbody = document.querySelector('#rItems tbody');
-    tbody.innerHTML = '';
-    var subtotal = 0;
-    var rows = document.querySelectorAll('#itemsTable tbody tr');
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var d = (r.querySelector('.itm-desc') || {}).value || '';
-      var q = Number((r.querySelector('.itm-qty') || {}).value || 0);
-      var p = Number((r.querySelector('.itm-price') || {}).value || 0);
-      var s = q * p;
-      subtotal += s;
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + escapeHtml(d) + '</td><td class="numeric">' + q + '</td><td class="numeric">' + to2(p) + '</td><td class="numeric">' + to2(s) + '</td>';
-      tbody.appendChild(tr);
+    function seedRows() {
+      if (!document.querySelectorAll('#itemsTable tbody tr').length) {
+        addItemRow('Magnetic Insect Screen', 1, 50);
+        addItemRow('Installation', 1, 30);
+      }
     }
 
-    // discount
-    var discType = (document.getElementById('discountType') || {}).value || 'none';
-    var discVal = Number((document.getElementById('discountValue') || {}).value || 0);
-    var discAmt = 0;
-    if (discType === 'percent') {
-      discAmt = subtotal * (discVal / 100);
-    } else if (discType === 'amount') {
-      discAmt = discVal;
+    function formatDateToMalay(dstr) {
+      if (!dstr) return '';
+      const dt = new Date(dstr);
+      if (isNaN(dt.getTime())) return dstr;
+      return dt.toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' });
     }
-    if (discAmt < 0) discAmt = 0;
-    if (discAmt > subtotal) discAmt = subtotal;
 
-    var total = subtotal - discAmt;
-    document.getElementById('rSubtotal').textContent = to2(subtotal);
-    document.getElementById('rDiscount').textContent = discAmt ? ('-' + to2(discAmt)) : '0.00';
-    document.getElementById('rTotal').textContent = to2(total);
-  }
+    function updatePreview() {
+      document.getElementById('rBizName').textContent = (document.getElementById('bizName') || {}).value || 'BelantikMaya';
+      document.getElementById('rBizAddr').textContent = (document.getElementById('bizAddr') || {}).value || '';
+      document.getElementById('rBizPhone').textContent = (document.getElementById('bizPhone') || {}).value || '';
+      document.getElementById('rBizWebsite').textContent = (document.getElementById('bizWebsite') || {}).value || '';
+      document.getElementById('rBizEmail').textContent = (document.getElementById('bizEmail') || {}).value || '';
 
-  function bindLiveInputs() {
-    var liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'];
-    for (var i = 0; i < liveIds.length; i++) {
-      var el = document.getElementById(liveIds[i]);
-      if (el) el.addEventListener('input', updatePreview);
+      const invField = (document.getElementById('invNo') || {}).value || '';
+      const invNo = invField.trim() || ('INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Math.floor(Math.random()*900+100)));
+      document.getElementById('rInv').textContent = invNo;
+
+      const dateVal = (document.getElementById('date') || {}).value || new Date().toISOString().slice(0,10);
+      document.getElementById('rDate').textContent = formatDateToMalay(dateVal);
+
+      document.getElementById('rPay').textContent = (document.getElementById('payMethod') || {}).value || '';
+
+      document.getElementById('rCustName').textContent = (document.getElementById('custName') || {}).value || '-';
+      const ce = (document.getElementById('custEmail') || {}).value || '';
+      const cp = (document.getElementById('custPhone') || {}).value || '';
+      document.getElementById('rCustEmail').textContent = ce ? ('Email: ' + ce) : '';
+      document.getElementById('rCustPhone').textContent = cp ? ('Tel: ' + cp) : '';
+
+      // build items in preview
+      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML = '';
+      let subtotal = 0;
+      document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
+        const d = (r.querySelector('.itm-desc') || {}).value || '';
+        const q = Number((r.querySelector('.itm-qty') || {}).value || 0);
+        const p = Number((r.querySelector('.itm-price') || {}).value || 0);
+        const s = q * p; subtotal += s;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(d)}</td><td class="numeric">${q}</td><td class="numeric">${to2(p)}</td><td class="numeric">${to2(s)}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      const discType = (document.getElementById('discountType') || {}).value || 'none';
+      const discVal = Number((document.getElementById('discountValue') || {}).value || 0);
+      let discAmt = 0;
+      if (discType === 'percent') discAmt = subtotal * (discVal / 100);
+      else if (discType === 'amount') discAmt = discVal;
+      if (discAmt < 0) discAmt = 0;
+      if (discAmt > subtotal) discAmt = subtotal;
+
+      const total = subtotal - discAmt;
+      document.getElementById('rSubtotal').textContent = to2(subtotal);
+      document.getElementById('rDiscount').textContent = discAmt ? ('-' + to2(discAmt)) : '0.00';
+      document.getElementById('rTotal').textContent = to2(total);
     }
-    var btnPreview = document.getElementById('updatePreview');
-    if (btnPreview) btnPreview.addEventListener('click', updatePreview);
 
-    var btnPrint = document.getElementById('printBtn');
-    if (btnPrint) btnPrint.addEventListener('click', function () {
-      updatePreview();
-      // small delay to ensure DOM repaint
-      setTimeout(function () { window.print(); }, 120);
-    });
+    // wait for images to load (logo) before PDF generation
+    function waitForImages(container) {
+      const imgs = Array.from(container.querySelectorAll('img'));
+      return Promise.all(imgs.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(res => { img.addEventListener('load', res); img.addEventListener('error', res); });
+      }));
+    }
 
-    var addBtn = document.getElementById('addRow');
-    if (addBtn) addBtn.addEventListener('click', function () { addItemRow('Perkara',1,0); });
+    // generate PDF using html2pdf, ensuring a single page and chosen paper size
+    async function generatePdf() {
+      updatePreview(); // ensure latest
+      const receipt = document.getElementById('receipt');
+      await waitForImages(receipt);
 
-    var resetBtn = document.getElementById('resetRows');
-    if (resetBtn) resetBtn.addEventListener('click', function () { itemsBody.innerHTML = ''; updatePreview(); });
-  }
+      // clone the receipt and set explicit paper size in mm
+      const clone = receipt.cloneNode(true);
+      const paper = (document.getElementById('paperSize') || {}).value || 'a4';
+      // set width in mm so html2pdf scales correctly
+      if (paper === 'a4') clone.style.width = '210mm';
+      else clone.style.width = '148mm'; // a5
 
-  // initialize
-  seedRows();
-  bindLiveInputs();
-  updatePreview();
-});
-</script>
+      // create off-screen wrapper to preserve computed styles
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      const filenameBase = (document.getElementById('invNo') || {}).value || 'resit';
+      const opt = {
+        margin: [8,8,8,8],
+        filename: `${filenameBase}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: false },
+        jsPDF: { unit: 'mm', format: paper, orientation: 'portrait' }
+      };
+
+      try {
+        await html2pdf().set(opt).from(clone).save();
+      } catch (err) {
+        console.error('PDF generation failed', err);
+        alert('Gagal hasilkan PDF. Sila cuba gunakan Print dialog sebagai fallback.');
+      } finally {
+        document.body.removeChild(wrapper);
+      }
+    }
+
+    // bind UI
+    function bindUI() {
+      ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue','paperSize'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updatePreview);
+      });
+      document.getElementById('updatePreview').addEventListener('click', updatePreview);
+      document.getElementById('addRow').addEventListener('click', ()=>{ addItemRow('Perkara',1,0); updatePreview(); });
+      document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); seedRows(); });
+      document.getElementById('printBtn').addEventListener('click', generatePdf);
+    }
+
+    // init
+    seedRows();
+    bindUI();
+    updatePreview();
+  });
+  </script>
 </body>
 </html>
