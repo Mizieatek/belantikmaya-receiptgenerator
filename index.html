@@ -13,10 +13,10 @@
       --paper-w:148mm;
       --paper-h:210mm;
       --logo-size:88px;
-      --col-gap:12px;
+      --gap:12px;
     }
     html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;color:var(--text);background:#faf9f6}
-    .app{display:flex;gap:var(--col-gap);padding:12px;box-sizing:border-box;min-height:100vh}
+    .app{display:flex;gap:var(--gap);padding:12px;box-sizing:border-box;min-height:100vh}
     .col{flex:1 1 0;min-width:300px;background:#fff;padding:14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06);box-sizing:border-box}
     label{display:block;font-size:13px;margin-top:12px;color:#333}
     input[type=text], input[type=number], textarea, select, input[type=date]{width:100%;padding:8px 10px;border:1px solid #e6e6e6;border-radius:6px;margin-top:6px;box-sizing:border-box}
@@ -70,6 +70,7 @@
 </head>
 <body>
   <div class="app">
+    <!-- Form column -->
     <div class="col" id="formCol">
       <h3>Konfigurasi Resit — BelantikMaya</h3>
 
@@ -152,11 +153,12 @@
 
       <div class="actions">
         <button id="updatePreview">Kemas kini Preview</button>
-        <button id="printBtn" style="background:var(--accent)">Muat Turun PDF</button>
+        <button id="printBtn" style="background:var(--accent)">Cetak Resit</button>
       </div>
 
     </div>
 
+    <!-- Preview column -->
     <div class="col" id="previewCol">
       <div class="preview-viewport">
         <div id="receipt" class="receipt" role="document">
@@ -187,6 +189,7 @@
               <div id="rCustPhone"></div>
             </div>
             <div class="inv">
+              <!-- intentionally left empty -->
             </div>
           </div>
 
@@ -206,7 +209,7 @@
     </div>
   </div>
 
-  <!-- html2pdf bundle (includes html2canvas & jsPDF) -->
+  <!-- html2pdf bundle -->
   <script src="https://unpkg.com/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
 
   <script>
@@ -227,12 +230,15 @@
       `;
       itemsBody.appendChild(tr);
 
+      // bind events for this row
       const descEl = tr.querySelector('.itm-desc');
       const qtyEl = tr.querySelector('.itm-qty');
       const priceEl = tr.querySelector('.itm-price');
       const delBtn = tr.querySelector('.del');
 
-      [descEl, qtyEl, priceEl].forEach(el => el.addEventListener('input', ()=>{ updateRowTotalsFor(tr); updatePreview(); }));
+      [descEl, qtyEl, priceEl].forEach(el => {
+        el.addEventListener('input', ()=>{ updateRowTotalsFor(tr); updatePreview(); });
+      });
       delBtn.addEventListener('click', ()=>{ tr.remove(); updatePreview(); });
 
       updateRowTotalsFor(tr);
@@ -245,9 +251,15 @@
       if(sumEl) sumEl.textContent = to2(q * p);
     }
 
-    document.getElementById('addRow').addEventListener('click', ()=> addItemRow('Perkara',1,0));
-    document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
+    // initial seeded rows if empty
+    function seedRows(){
+      if(!document.querySelectorAll('#itemsTable tbody tr').length){
+        addItemRow('Magnetic Insect Screen',1,50);
+        addItemRow('Installation',1,30);
+      }
+    }
 
+    // date format dd Mon yyyy in Malay
     function formatDateToMalay(dstr){
       if(!dstr) return '';
       const dt = new Date(dstr);
@@ -255,6 +267,7 @@
       return dt.toLocaleDateString('ms-MY',{day:'2-digit',month:'short',year:'numeric'});
     }
 
+    // main preview update
     function updatePreview(){
       const bizName = (document.getElementById('bizName')||{}).value || 'BelantikMaya';
       const bizAddr = (document.getElementById('bizAddr')||{}).value || '';
@@ -285,7 +298,8 @@
       document.getElementById('rCustEmail').textContent = cEmail ? ('Email: ' + cEmail) : '';
       document.getElementById('rCustPhone').textContent = cPhone ? ('Tel: ' + cPhone) : '';
 
-      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML='';
+      // build items
+      const tbody = document.querySelector('#rItems tbody'); tbody.innerHTML = '';
       let subtotal = 0;
       document.querySelectorAll('#itemsTable tbody tr').forEach(r => {
         const d = (r.querySelector('.itm-desc')||{}).value || '';
@@ -297,6 +311,7 @@
         tbody.appendChild(tr);
       });
 
+      // discount
       const discType = (document.getElementById('discountType')||{}).value || 'none';
       const discVal = Number((document.getElementById('discountValue')||{}).value || 0);
       let discAmt = 0;
@@ -311,67 +326,76 @@
       const total = subtotal - discAmt;
 
       document.getElementById('rSubtotal').textContent = to2(subtotal);
-      document.getElementById('rDiscount').textContent = '-' + to2(discAmt);
+      document.getElementById('rDiscount').textContent = discAmt ? ('-' + to2(discAmt)) : '0.00';
       document.getElementById('rTotal').textContent = to2(total);
     }
 
-    // Helper: ensure images inside element loaded
-    function waitForImages(container) {
+    // ensure images loaded before rendering PDF
+    function waitForImages(container){
       const imgs = Array.from(container.querySelectorAll('img'));
       const promises = imgs.map(img => {
-        if (img.complete) return Promise.resolve();
+        if(img.complete) return Promise.resolve();
         return new Promise(res => { img.addEventListener('load', res); img.addEventListener('error', res); });
       });
       return Promise.all(promises);
     }
 
-    document.getElementById('printBtn').addEventListener('click', async function () {
+    // print/download PDF handler
+    async function handlePrint(){
       const receiptEl = document.getElementById('receipt');
+      // ensure preview is fresh
+      updatePreview();
 
-      // wait for images to load
+      // wait images
       await waitForImages(receiptEl);
 
-      // clone and wrap
+      // clone to avoid DOM changes
       const clone = receiptEl.cloneNode(true);
       const wrapper = document.createElement('div');
       wrapper.style.boxSizing = 'border-box';
       wrapper.appendChild(clone);
+      // attach off-screen so styles apply
       wrapper.style.position = 'fixed';
       wrapper.style.left = '-9999px';
       document.body.appendChild(wrapper);
 
       const opt = {
-        margin: [10, 10, 10, 10], // mm
+        margin: [10,10,10,10],
         filename: (document.getElementById('invNo').value || 'resit') + '.pdf',
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: false, logging: false },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: false },
         jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' },
         enableLinks: true
       };
 
-      try {
+      try{
         await html2pdf().set(opt).from(clone).save();
-      } catch (e) {
-        console.error('html2pdf error:', e);
+      }catch(err){
+        console.error(err);
+        // fallback
         window.print();
-      } finally {
+      }finally{
         document.body.removeChild(wrapper);
       }
-    });
-
-    ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.addEventListener('input', updatePreview);
-    });
-
-    document.getElementById('addRow').addEventListener('click', ()=> addItemRow('Perkara',1,0));
-    document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
-
-    if(!document.querySelectorAll('#itemsTable tbody tr').length){
-      addItemRow('Magnetic Insect Screen',1,50);
-      addItemRow('Installation',1,30);
     }
 
+    // bind UI events (including dynamic rows)
+    function bindLiveInputs(){
+      const liveIds = ['bizName','bizAddr','bizPhone','bizWebsite','bizEmail','custName','custEmail','custPhone','invNo','date','payMethod','discountType','discountValue'];
+      liveIds.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('input', updatePreview);
+      });
+
+      document.getElementById('updatePreview').addEventListener('click', updatePreview);
+      document.getElementById('printBtn').addEventListener('click', handlePrint);
+      document.getElementById('addRow').addEventListener('click', ()=>{ addItemRow('Perkara',1,0); updatePreview(); });
+      document.getElementById('resetRows').addEventListener('click', ()=>{ itemsBody.innerHTML=''; updatePreview(); });
+    }
+
+    // init
+    seedRows();
+    bindLiveInputs();
     updatePreview();
   });
   </script>
